@@ -14,11 +14,28 @@ func Tags(tags []booru.FusedTag) string {
 
 	var b strings.Builder
 
-	b.WriteString("| tag | category | popularity | works | client |\n|---|---|---|---|---|\n")
+	for _, tag := range tags {
+		fmt.Fprintf(&b, "- %s (%s): popularity %d%%, %d works on %s\n",
+			tag.Name, tag.Category, int(tag.Score), tag.Count, tag.Client)
+	}
+
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func Popular(tags []booru.FusedTag) string {
+	if len(tags) == 0 {
+		return "No popular tags were returned."
+	}
+
+	var b strings.Builder
 
 	for _, tag := range tags {
-		fmt.Fprintf(&b, "| %s | %s | %d%% | %d | %s |\n",
-			tag.Name, tag.Category, int(tag.Score), tag.Count, tag.Client)
+		fmt.Fprintf(&b, "- %s (%s)\n", tag.Name, tag.Category)
+
+		for _, count := range tag.Clients {
+			fmt.Fprintf(&b, "  - %s: %d works, rank %d, %d%%\n",
+				count.Client, count.Count, count.Rank, count.Pct)
+		}
 	}
 
 	return strings.TrimRight(b.String(), "\n")
@@ -31,10 +48,8 @@ func Related(tags []booru.RelatedTag, skipped []booru.Skipped) string {
 		b.WriteString("No related tags were returned. Related tags are only available from clients with a related-tag " +
 			"API, so an empty or short result is expected rather than a failure.\n")
 	} else {
-		b.WriteString("| tag | client | score |\n|---|---|---|\n")
-
 		for _, tag := range tags {
-			fmt.Fprintf(&b, "| %s | %s | %d |\n", tag.Tag, tag.Client, tag.Score)
+			fmt.Fprintf(&b, "- %s (%s): score %d\n", tag.Tag, tag.Client, tag.Score)
 		}
 
 		b.WriteString("Related tags are only available from clients with a related-tag API, so this list may be shorter " +

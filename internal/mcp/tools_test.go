@@ -108,6 +108,28 @@ func TestTagsCallReturnsCounts(t *testing.T) {
 	}
 }
 
+func TestPopularCallReturnsPerClientBreakdown(t *testing.T) {
+	provider := &stubProvider{popular: []booru.Tag{
+		{Name: "blue_eyes", Category: booru.CategoryGeneral, Count: 900},
+		{Name: "smile", Category: booru.CategoryGeneral, Count: 450},
+	}}
+
+	session := newSession(t, provider, catalog.Options{MaxLimit: 100, CacheTTL: 24 * time.Hour})
+	result := callTool(t, session, "popular", map[string]any{})
+
+	if result.IsError {
+		t.Fatalf("popular returned an error: %s", textOf(t, result))
+	}
+
+	text := textOf(t, result)
+
+	for _, want := range []string{"blue_eyes", "danbooru", "900 works, rank 1, 100%"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("text = %q, want %q", text, want)
+		}
+	}
+}
+
 func TestGetCallReturnsPermalinkOnly(t *testing.T) {
 	provider := &stubProvider{post: booru.Post{
 		Client:     "danbooru",

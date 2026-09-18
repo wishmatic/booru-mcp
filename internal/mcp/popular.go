@@ -72,7 +72,7 @@ func (h *handlers) popular(
 		Warnings: result.Warnings,
 	}
 
-	text := present.Tags(result.Tags)
+	text := present.Popular(result.Tags)
 
 	if note := present.Skipped(result.Skipped); note != "" {
 		text += "\n" + note

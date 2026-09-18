@@ -14,7 +14,10 @@ func TestTags(t *testing.T) {
 		{Name: "smile", Category: booru.CategoryGeneral, Score: 50, Count: 450, Client: "danbooru"},
 	})
 
-	for _, want := range []string{"blue_eyes", "100%", "900", "danbooru", "smile", "50%"} {
+	for _, want := range []string{
+		"- blue_eyes (general): popularity 100%, 900 works on danbooru",
+		"- smile (general): popularity 50%, 450 works on danbooru",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Tags() = %q, missing %q", out, want)
 		}
@@ -25,13 +28,44 @@ func TestTags(t *testing.T) {
 	}
 }
 
+func TestPopular(t *testing.T) {
+	out := Popular([]booru.FusedTag{{
+		Name:     "blue_eyes",
+		Category: booru.CategoryGeneral,
+		Count:    900,
+		Clients: []booru.TagCount{
+			{Client: "danbooru", Count: 900, Rank: 1, Pct: 100},
+			{Client: "gelbooru", Count: 400, Rank: 3, Pct: 45},
+		},
+	}})
+
+	for _, want := range []string{
+		"- blue_eyes (general)",
+		"  - danbooru: 900 works, rank 1, 100%",
+		"  - gelbooru: 400 works, rank 3, 45%",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("Popular() = %q, missing %q", out, want)
+		}
+	}
+
+	if got := Popular(nil); got != "No popular tags were returned." {
+		t.Errorf("Popular(nil) = %q", got)
+	}
+}
+
 func TestRelatedStatesPartialCoverage(t *testing.T) {
 	out := Related(
 		[]booru.RelatedTag{{Tag: "blue_eyes", Client: "danbooru", Score: 900}},
 		[]booru.Skipped{{Client: "yandere", Reason: "the client has no related-tag API"}},
 	)
 
-	for _, want := range []string{"blue_eyes", "yandere", "no related-tag API", "shorter than requested"} {
+	for _, want := range []string{
+		"- blue_eyes (danbooru): score 900",
+		"yandere",
+		"no related-tag API",
+		"shorter than requested",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Related() = %q, missing %q", out, want)
 		}
