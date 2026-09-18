@@ -50,8 +50,16 @@ func New(cfg config.Config, log *zap.Logger) (*Server, error) {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
+	if mode := storeClient.JournalMode(); mode != "wal" {
+		log.Warn("sqlite is not in WAL mode; this filesystem does not support it",
+			zap.String("path", cfg.DBPath),
+			zap.String("journal_mode", mode),
+		)
+	}
+
 	log.Info("database opened",
 		zap.String("path", cfg.DBPath),
+		zap.String("journal_mode", storeClient.JournalMode()),
 		zap.Int("cache_ttl_days", cfg.CacheTTLDays),
 	)
 

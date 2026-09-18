@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,6 +36,71 @@ func TestNewCreatesParentDirectory(t *testing.T) {
 
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("Stat() error: %v", err)
+	}
+}
+
+func TestNewUsesWAL(t *testing.T) {
+	client := newTestStore(t)
+
+	if mode := client.JournalMode(); mode != "wal" {
+		t.Fatalf("JournalMode() = %q, want wal", mode)
+	}
+}
+
+func TestNewFallsBackWhenWALUnavailable(t *testing.T) {
+	apply := func(mode string) (string, error) {
+		if mode == journalModeWAL {
+			return "", errors.New("unable to open database file (14)")
+		}
+
+		return mode, nil
+	}
+
+	mode, err := chooseJournalMode(apply)
+	if err != nil {
+		t.Fatalf("chooseJournalMode() error: %v", err)
+	}
+
+	if mode != journalModeDelete {
+		t.Fatalf("chooseJournalMode() = %q, want %q", mode, journalModeDelete)
+	}
+}
+
+func TestChooseJournalModeFailsWhenNoModeApplies(t *testing.T) {
+	apply := func(string) (string, error) {
+		return "", errors.New("attempt to write a readonly database (1544)")
+	}
+
+	if _, err := chooseJournalMode(apply); err == nil {
+		t.Fatal("chooseJournalMode() error = nil, want an error when no journal mode can be enabled")
+	}
+}
+
+func TestNewRejectsUnwritablePath(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses file permissions")
+	}
+
+	path := filepath.Join(t.TempDir(), "test.db")
+
+	if err := os.WriteFile(path, nil, 0o444); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	if _, err := New(path); err == nil {
+		t.Fatal("New() error = nil, want an error for an unwritable database file")
+	}
+}
+
+func TestNewRejectsDirectoryPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+
+	if err := os.Mkdir(path, 0o755); err != nil {
+		t.Fatalf("Mkdir() error: %v", err)
+	}
+
+	if _, err := New(path); err == nil {
+		t.Fatal("New() error = nil, want an error for a directory path")
 	}
 }
 
