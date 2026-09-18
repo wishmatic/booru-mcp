@@ -74,6 +74,10 @@ This server aggregates third-party NSFW APIs. The defaults are convenient, not s
 - Content is third-party and unreviewed.
     - This project neither controls nor vets any tag, post, or URL it returns.
 
+Also this was, at time of writing, nearly 100% vibe coded with a decent planning phase. Diligence and testing along
+with a small surface area of functionality make it safe to use, in our opinion. Work may be done to go over the code
+to comphrend, improve, and re-architect it.
+
 ## License
 
 Booru MCP is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
