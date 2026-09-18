@@ -34,7 +34,7 @@ func testConfig(t *testing.T) config.Config {
 	t.Helper()
 
 	for _, key := range []string{
-		"DANBOORU_URL", "RULE34_URL", "DANBOORU_LOGIN", "DANBOORU_API_KEY",
+		"KONACHAN_URL", "DANBOORU_LOGIN", "DANBOORU_API_KEY",
 		"RULE34_API_KEY", "RULE34_USER_ID", "E621_LOGIN", "E621_API_KEY",
 	} {
 		t.Setenv(key, "")

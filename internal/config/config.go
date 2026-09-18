@@ -15,6 +15,25 @@ import (
 
 const DefaultUserAgent = "booru-mcp/0.1.0"
 
+const (
+	danbooruURL    = "https://danbooru.donmai.us"
+	aibooruURL     = "https://aibooru.online"
+	gelbooruURL    = "https://gelbooru.com"
+	rule34URL      = "https://rule34.xxx"
+	realbooruURL   = "https://realbooru.com"
+	xbooruURL      = "https://xbooru.com"
+	tbibURL        = "https://tbib.org"
+	safebooruURL   = "https://safebooru.org"
+	yandereURL     = "https://yande.re"
+	konachanURL    = "https://konachan.com"
+	sakugabooruURL = "https://sakugabooru.com"
+	e621URL        = "https://e621.net"
+	e926URL        = "https://e926.net"
+	derpibooruURL  = "https://derpibooru.org"
+	twibooruURL    = "https://twibooru.org"
+	furbooruURL    = "https://furbooru.org"
+)
+
 type Family string
 
 const (
@@ -25,6 +44,8 @@ const (
 	FamilyPhilomena Family = "philomena"
 )
 
+// URLEnv is the envar that may override DefaultURL, and is empty for sites whose address is always the same. Only
+// konachan has one, because konachan.net is the SFW mirror of konachan.com.
 type ClientSpec struct {
 	Name              string
 	Family            Family
@@ -38,70 +59,65 @@ type ClientSpec struct {
 
 var clientSpecs = []ClientSpec{
 	{
-		Name: "danbooru", Family: FamilyDanbooru, DefaultURL: "https://danbooru.donmai.us",
-		URLEnv: "DANBOORU_URL", OptionalCreds: []string{"DANBOORU_LOGIN", "DANBOORU_API_KEY"}, InDefault: true,
+		Name: "danbooru", Family: FamilyDanbooru, DefaultURL: danbooruURL,
+		OptionalCreds: []string{"DANBOORU_LOGIN", "DANBOORU_API_KEY"}, InDefault: true,
 	},
 	{
-		Name: "aibooru", Family: FamilyDanbooru, DefaultURL: "https://aibooru.online",
-		URLEnv: "AIBOORU_URL", OptionalCreds: []string{"AIBOORU_LOGIN", "AIBOORU_API_KEY"},
+		Name: "aibooru", Family: FamilyDanbooru, DefaultURL: aibooruURL,
+		OptionalCreds: []string{"AIBOORU_LOGIN", "AIBOORU_API_KEY"},
 	},
 	{
-		Name: "gelbooru", Family: FamilyGelbooru, DefaultURL: "https://gelbooru.com",
-		URLEnv: "GELBOORU_URL", RequiredCreds: []string{"GELBOORU_API_KEY", "GELBOORU_USER_ID"}, InDefault: true,
+		Name: "gelbooru", Family: FamilyGelbooru, DefaultURL: gelbooruURL,
+		RequiredCreds: []string{"GELBOORU_API_KEY", "GELBOORU_USER_ID"}, InDefault: true,
 	},
 	{
-		Name: "rule34", Family: FamilyGelbooru, DefaultURL: "https://rule34.xxx",
-		URLEnv: "RULE34_URL", RequiredCreds: []string{"RULE34_API_KEY", "RULE34_USER_ID"}, InDefault: true,
+		Name: "rule34", Family: FamilyGelbooru, DefaultURL: rule34URL,
+		RequiredCreds: []string{"RULE34_API_KEY", "RULE34_USER_ID"}, InDefault: true,
 	},
 	{
-		Name: "realbooru", Family: FamilyGelbooru, DefaultURL: "https://realbooru.com",
-		URLEnv: "REALBOORU_URL", RequiredCreds: []string{"REALBOORU_API_KEY", "REALBOORU_USER_ID"}, InDefault: true,
+		Name: "realbooru", Family: FamilyGelbooru, DefaultURL: realbooruURL,
+		RequiredCreds: []string{"REALBOORU_API_KEY", "REALBOORU_USER_ID"}, InDefault: true,
 	},
 	{
-		Name: "xbooru", Family: FamilyGelbooru, DefaultURL: "https://xbooru.com",
-		URLEnv: "XBOORU_URL", RequiredCreds: []string{"XBOORU_API_KEY", "XBOORU_USER_ID"}, InDefault: true,
+		Name: "xbooru", Family: FamilyGelbooru, DefaultURL: xbooruURL,
+		RequiredCreds: []string{"XBOORU_API_KEY", "XBOORU_USER_ID"}, InDefault: true,
 	},
 	{
-		Name: "tbib", Family: FamilyGelbooru, DefaultURL: "https://tbib.org",
-		URLEnv: "TBIB_URL", RequiredCreds: []string{"TBIB_API_KEY", "TBIB_USER_ID"}, InDefault: true,
+		Name: "tbib", Family: FamilyGelbooru, DefaultURL: tbibURL,
+		RequiredCreds: []string{"TBIB_API_KEY", "TBIB_USER_ID"}, InDefault: true,
 	},
 	{
-		Name: "safebooru", Family: FamilyGelbooru, DefaultURL: "https://safebooru.org",
-		URLEnv: "SAFEBOORU_URL", InDefault: true,
+		Name: "safebooru", Family: FamilyGelbooru, DefaultURL: safebooruURL, InDefault: true,
 	},
 	{
-		Name: "yandere", Family: FamilyMoebooru, DefaultURL: "https://yande.re",
-		URLEnv: "YANDERE_URL", InDefault: true,
+		Name: "yandere", Family: FamilyMoebooru, DefaultURL: yandereURL, InDefault: true,
 	},
 	{
-		Name: "konachan", Family: FamilyMoebooru, DefaultURL: "https://konachan.com",
+		Name: "konachan", Family: FamilyMoebooru, DefaultURL: konachanURL,
 		URLEnv: "KONACHAN_URL", InDefault: true,
 	},
 	{
-		Name: "sakugabooru", Family: FamilyMoebooru, DefaultURL: "https://sakugabooru.com",
-		URLEnv: "SAKUGABOORU_URL", InDefault: true,
+		Name: "sakugabooru", Family: FamilyMoebooru, DefaultURL: sakugabooruURL, InDefault: true,
 	},
 	{
-		Name: "e621", Family: FamilyE621, DefaultURL: "https://e621.net",
-		URLEnv: "E621_URL", OptionalCreds: []string{"E621_LOGIN", "E621_API_KEY"}, InDefault: true,
-		RequiresUserAgent: true,
+		Name: "e621", Family: FamilyE621, DefaultURL: e621URL,
+		OptionalCreds: []string{"E621_LOGIN", "E621_API_KEY"}, InDefault: true, RequiresUserAgent: true,
 	},
 	{
-		Name: "e926", Family: FamilyE621, DefaultURL: "https://e926.net",
-		URLEnv: "E926_URL", OptionalCreds: []string{"E926_LOGIN", "E926_API_KEY"},
-		RequiresUserAgent: true,
+		Name: "e926", Family: FamilyE621, DefaultURL: e926URL,
+		OptionalCreds: []string{"E926_LOGIN", "E926_API_KEY"}, RequiresUserAgent: true,
 	},
 	{
-		Name: "derpibooru", Family: FamilyPhilomena, DefaultURL: "https://derpibooru.org",
-		URLEnv: "DERPIBOORU_URL", RequiredCreds: []string{"DERPIBOORU_API_KEY"}, InDefault: true,
+		Name: "derpibooru", Family: FamilyPhilomena, DefaultURL: derpibooruURL,
+		RequiredCreds: []string{"DERPIBOORU_API_KEY"}, InDefault: true,
 	},
 	{
-		Name: "twibooru", Family: FamilyPhilomena, DefaultURL: "https://twibooru.org",
-		URLEnv: "TWIBOORU_URL", RequiredCreds: []string{"TWIBOORU_API_KEY"}, InDefault: true,
+		Name: "twibooru", Family: FamilyPhilomena, DefaultURL: twibooruURL,
+		RequiredCreds: []string{"TWIBOORU_API_KEY"}, InDefault: true,
 	},
 	{
-		Name: "furbooru", Family: FamilyPhilomena, DefaultURL: "https://furbooru.org",
-		URLEnv: "FURBOORU_URL", RequiredCreds: []string{"FURBOORU_API_KEY"}, InDefault: true,
+		Name: "furbooru", Family: FamilyPhilomena, DefaultURL: furbooruURL,
+		RequiredCreds: []string{"FURBOORU_API_KEY"}, InDefault: true,
 	},
 }
 
@@ -198,8 +214,10 @@ func (c Config) ClientURL(name string) string {
 		return ""
 	}
 
-	if override := c.Env(spec.URLEnv); override != "" {
-		return override
+	if spec.URLEnv != "" {
+		if override := c.Env(spec.URLEnv); override != "" {
+			return override
+		}
 	}
 
 	return spec.DefaultURL
@@ -314,7 +332,12 @@ func (c Config) Validate() error {
 
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme == "" || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-			return fmt.Errorf("%s: %q is not an absolute http or https URL", spec.URLEnv, raw)
+			label := spec.URLEnv
+			if label == "" {
+				label = spec.Name + " URL"
+			}
+
+			return fmt.Errorf("%s: %q is not an absolute http or https URL", label, raw)
 		}
 	}
 
