@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -25,74 +26,257 @@ func unsetEnv(t *testing.T, key string) {
 	})
 }
 
-func TestLoadDefaults(t *testing.T) {
-	unsetEnv(t, "HOST")
-	unsetEnv(t, "PORT")
-	unsetEnv(t, "LOG_LEVEL")
-	unsetEnv(t, "API_KEY")
+func testConfig(t *testing.T) Config {
+	t.Helper()
 
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load() error: %v", err)
+	for _, key := range []string{"BOORU_CLIENTS", "RULE34_URL", "DANBOORU_URL", "E621_URL"} {
+		unsetEnv(t, key)
 	}
 
-	if cfg.Host != "0.0.0.0" {
-		t.Errorf("Host = %q, want 0.0.0.0", cfg.Host)
+	return Config{
+		APIKey:                "key",
+		DefaultClientsRaw:     "rule34,danbooru,gelbooru",
+		UserAgent:             DefaultUserAgent,
+		RateLimitRPS:          1,
+		RateLimitBurst:        1,
+		RequestTimeoutSeconds: 20,
+		MaxLimit:              100,
+		CacheTTLDays:          30,
+		DBPath:                "booru-mcp.db",
+		ContentRatingRaw:      "all",
+	}
+}
+
+func TestEnabledClientsDefault(t *testing.T) {
+	cfg := testConfig(t)
+
+	enabled := cfg.EnabledClients()
+
+	if len(enabled) != len(clientSpecs)-2 {
+		t.Fatalf("EnabledClients() = %d clients, want %d", len(enabled), len(clientSpecs)-2)
 	}
 
-	if cfg.Port != 8080 {
-		t.Errorf("Port = %d, want 8080", cfg.Port)
+	for _, name := range enabled {
+		if name == "aibooru" || name == "e926" {
+			t.Errorf("EnabledClients() contains %q, want the mirror and side corpora excluded by default", name)
+		}
+	}
+}
+
+func TestEnabledClientsAll(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Clients = "all"
+
+	if got := len(cfg.EnabledClients()); got != len(clientSpecs) {
+		t.Fatalf("EnabledClients() = %d clients, want %d", got, len(clientSpecs))
+	}
+}
+
+func TestEnabledClientsExplicit(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Clients = "danbooru, rule34"
+
+	if got := cfg.EnabledClients(); len(got) != 2 || got[0] != "danbooru" || got[1] != "rule34" {
+		t.Fatalf("EnabledClients() = %v, want [danbooru rule34]", got)
+	}
+}
+
+func TestDefaultClients(t *testing.T) {
+	cfg := testConfig(t)
+
+	if got := cfg.DefaultClients(); len(got) != 3 || got[0] != "rule34" || got[1] != "danbooru" || got[2] != "gelbooru" {
+		t.Fatalf("DefaultClients() = %v, want [rule34 danbooru gelbooru]", got)
+	}
+}
+
+func TestClientURLOverride(t *testing.T) {
+	cfg := testConfig(t)
+	t.Setenv("RULE34_URL", "https://mirror.example.com/")
+
+	if got := cfg.ClientURL("rule34"); got != "https://mirror.example.com/" {
+		t.Errorf("ClientURL(rule34) = %q, want the override", got)
 	}
 
-	if cfg.LogLevel != "info" {
-		t.Errorf("LogLevel = %q, want info", cfg.LogLevel)
+	if got := cfg.ClientURL("danbooru"); got != "https://danbooru.donmai.us" {
+		t.Errorf("ClientURL(danbooru) = %q, want the default", got)
+	}
+}
+
+func TestCacheTTL(t *testing.T) {
+	cfg := testConfig(t)
+
+	if got := cfg.CacheTTL(); got.Hours() != 720 {
+		t.Errorf("CacheTTL() = %v, want 720h", got)
 	}
 
-	if cfg.APIKey != "" {
-		t.Errorf("APIKey = %q, want empty", cfg.APIKey)
+	cfg.CacheTTLDays = 0
+
+	if got := cfg.CacheTTL(); got != 0 {
+		t.Errorf("CacheTTL() = %v, want 0", got)
+	}
+}
+
+func TestBlockedTags(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.BlockedTagsRaw = " Some Tag , other ,, some_tag "
+
+	got := cfg.BlockedTags()
+	if len(got) != 2 || got[0] != "some_tag" || got[1] != "other" {
+		t.Fatalf("BlockedTags() = %v, want [some_tag other]", got)
+	}
+
+	cfg.BlockedTagsRaw = ""
+
+	if got := cfg.BlockedTags(); len(got) != 0 {
+		t.Fatalf("BlockedTags() = %v, want empty", got)
+	}
+}
+
+func TestValidateRateLimit(t *testing.T) {
+	for _, rps := range []float64{0, -1} {
+		cfg := testConfig(t)
+		cfg.RateLimitRPS = rps
+
+		err := cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), "RATE_LIMIT_RPS") {
+			t.Fatalf("Validate() error = %v, want it to name RATE_LIMIT_RPS", err)
+		}
+	}
+}
+
+func TestValidateContentRating(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.ContentRatingRaw = "nsfw"
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "CONTENT_RATING") {
+		t.Fatalf("Validate() error = %v, want it to name CONTENT_RATING", err)
+	}
+
+	for _, value := range []string{"general", "sensitive", "questionable", "explicit", "all"} {
+		if !strings.Contains(err.Error(), value) {
+			t.Errorf("error %q does not list the accepted value %q", err, value)
+		}
+	}
+}
+
+func TestContentRatingDefault(t *testing.T) {
+	cfg := testConfig(t)
+
+	if got, err := cfg.ContentRating(); err != nil || got != "all" {
+		t.Fatalf("ContentRating() = %q, %v, want all", got, err)
+	}
+}
+
+func TestValidateUnknownClient(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Clients = "danbooru,nope"
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "nope") {
+		t.Fatalf("Validate() error = %v, want it to name nope", err)
+	}
+}
+
+func TestValidateDefaultClientNotEnabled(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Clients = "danbooru"
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "DEFAULT_CLIENTS") {
+		t.Fatalf("Validate() error = %v, want it to name DEFAULT_CLIENTS", err)
+	}
+}
+
+func TestValidateBadURLOverride(t *testing.T) {
+	cfg := testConfig(t)
+	t.Setenv("RULE34_URL", "not-a-url")
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "RULE34_URL") {
+		t.Fatalf("Validate() error = %v, want it to name RULE34_URL", err)
+	}
+}
+
+func TestClientActiveMissingCredentials(t *testing.T) {
+	cfg := testConfig(t)
+	t.Setenv("RULE34_API_KEY", "")
+	t.Setenv("RULE34_USER_ID", "")
+
+	active, reason := cfg.ClientActive("rule34")
+	if active {
+		t.Fatal("ClientActive(rule34) = true, want false without credentials")
+	}
+
+	for _, want := range []string{"RULE34_API_KEY", "RULE34_USER_ID"} {
+		if !strings.Contains(reason, want) {
+			t.Errorf("reason %q does not name %s", reason, want)
+		}
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("Validate() error = %v, want missing credentials not to fail startup", err)
+	}
+}
+
+func TestClientActiveReasonHidesSecrets(t *testing.T) {
+	cfg := testConfig(t)
+	t.Setenv("RULE34_API_KEY", "super-secret-value")
+	t.Setenv("RULE34_USER_ID", "")
+
+	active, reason := cfg.ClientActive("rule34")
+	if active {
+		t.Fatal("ClientActive(rule34) = true, want false")
+	}
+
+	if strings.Contains(reason, "super-secret-value") {
+		t.Fatalf("reason %q leaks a credential", reason)
+	}
+}
+
+func TestClientActiveUserAgent(t *testing.T) {
+	cfg := testConfig(t)
+	t.Setenv("E621_LOGIN", "")
+	t.Setenv("E621_API_KEY", "")
+
+	if active, reason := cfg.ClientActive("e621"); active || !strings.Contains(reason, "USER_AGENT") {
+		t.Fatalf("ClientActive(e621) = %v, %q, want inactive naming USER_AGENT", active, reason)
+	}
+
+	cfg.UserAgent = "booru-mcp contact@example.com"
+
+	if active, reason := cfg.ClientActive("e621"); !active {
+		t.Fatalf("ClientActive(e621) = false, %q, want active with a custom User-Agent", reason)
+	}
+}
+
+func TestAddrAndVerboseErrors(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.Host = "127.0.0.1"
+	cfg.Port = 9000
+	cfg.ErrorDetail = "verbose"
+
+	if got := cfg.Addr(); got != "127.0.0.1:9000" {
+		t.Errorf("Addr() = %q", got)
+	}
+
+	if !cfg.VerboseErrors() {
+		t.Error("VerboseErrors() = false, want true")
 	}
 }
 
 func TestLoadValues(t *testing.T) {
-	t.Setenv("HOST", "127.0.0.1")
-	t.Setenv("PORT", "9000")
-	t.Setenv("LOG_LEVEL", "debug")
 	t.Setenv("API_KEY", "secret")
+	t.Setenv("RATE_LIMIT_RPS", "2.5")
+	t.Setenv("CACHE_TTL_DAYS", "7")
+	t.Setenv("CONTENT_RATING", "questionable")
 
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if cfg.Host != "127.0.0.1" {
-		t.Errorf("Host = %q, want 127.0.0.1", cfg.Host)
-	}
-
-	if cfg.Port != 9000 {
-		t.Errorf("Port = %d, want 9000", cfg.Port)
-	}
-
-	if cfg.LogLevel != "debug" {
-		t.Errorf("LogLevel = %q, want debug", cfg.LogLevel)
-	}
-
-	if cfg.APIKey != "secret" {
-		t.Errorf("APIKey = %q, want secret", cfg.APIKey)
-	}
-}
-
-func TestLoadRejectsInvalidPort(t *testing.T) {
-	t.Setenv("PORT", "not-a-number")
-
-	if _, err := Load(); err == nil {
-		t.Fatal("Load() error = nil, want an error")
-	}
-}
-
-func TestAddr(t *testing.T) {
-	cfg := Config{Host: "127.0.0.1", Port: 9000}
-
-	if got := cfg.Addr(); got != "127.0.0.1:9000" {
-		t.Fatalf("Addr() = %q, want 127.0.0.1:9000", got)
+	if cfg.APIKey != "secret" || cfg.RateLimitRPS != 2.5 || cfg.CacheTTLDays != 7 || cfg.ContentRatingRaw != "questionable" {
+		t.Fatalf("Load() = %+v, want the configured values", cfg)
 	}
 }

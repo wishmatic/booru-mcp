@@ -21,3 +21,6 @@
 coverage.txt
 coverage.html
 *.log
+*.db
+*.db-wal
+*.db-shm

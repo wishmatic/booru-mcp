@@ -63,6 +63,22 @@ flowchart TD
         mcp["internal/mcp"]
     end
 
+    subgraph domain[Domain libraries]
+        catalog["internal/catalog"]
+        booru["internal/booru"]
+        present["internal/present"]
+    end
+
+    subgraph clients[Backend and infrastructure clients]
+        danbooru["internal/danbooru"]
+        gelbooru["internal/gelbooru"]
+        moebooru["internal/moebooru"]
+        e621["internal/e621"]
+        philomena["internal/philomena"]
+        fetch["internal/fetch"]
+        store["internal/store"]
+    end
+
     subgraph platform[Platform]
         config["internal/config"]
         auth["internal/auth"]
@@ -73,8 +89,40 @@ flowchart TD
     cmd --> config
 
     server --> mcp
+    server --> catalog
+    server --> danbooru
+    server --> gelbooru
+    server --> moebooru
+    server --> e621
+    server --> philomena
+    server --> fetch
+    server --> store
     server --> auth
     server --> config
+
+    mcp --> catalog
+    mcp --> booru
+    mcp --> present
+
+    catalog --> booru
+    catalog --> store
+
+    present --> booru
+
+    danbooru --> booru
+    danbooru --> fetch
+    gelbooru --> booru
+    gelbooru --> fetch
+    moebooru --> booru
+    moebooru --> fetch
+    e621 --> booru
+    e621 --> fetch
+    philomena --> booru
+    philomena --> fetch
+
+    fetch --> utils
+    store --> utils
+    config --> booru
 ```
 
 ## Comments and Docstrings
