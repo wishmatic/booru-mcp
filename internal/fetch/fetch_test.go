@@ -158,6 +158,36 @@ func TestRetriesExhausted(t *testing.T) {
 	}
 }
 
+func TestVerboseErrorIncludesStatusAndBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"message":"You cannot search for more than 2 tags at a time."}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := New(Config{
+		BaseURL:       server.URL,
+		UserAgent:     "booru-mcp-test",
+		Timeout:       5 * time.Second,
+		Limiter:       &countingLimiter{},
+		VerboseErrors: true,
+	})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	_, err = GetJSON[map[string]any](context.Background(), client, "danbooru", "/posts.json", nil)
+	if err == nil {
+		t.Fatal("GetJSON() error = nil, want an error")
+	}
+
+	for _, want := range []string{"422", "422 Unprocessable Entity", "more than 2 tags"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err.Error(), want)
+		}
+	}
+}
+
 func TestErrorBodyIsBounded(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

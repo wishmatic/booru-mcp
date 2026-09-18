@@ -49,15 +49,17 @@ type HTTPError struct {
 }
 
 func (e *HTTPError) Error() string {
+	message := fmt.Sprintf("%s %s %s returned HTTP %d", e.Label, e.Method, e.Path, e.StatusCode)
+
 	if e.Status != "" {
-		return fmt.Sprintf("%s %s %s returned HTTP %d (%s)", e.Label, e.Method, e.Path, e.StatusCode, e.Status)
+		message += fmt.Sprintf(" (%s)", e.Status)
 	}
 
 	if e.Body != "" {
-		return fmt.Sprintf("%s %s %s returned HTTP %d: %s", e.Label, e.Method, e.Path, e.StatusCode, e.Body)
+		message += ": " + e.Body
 	}
 
-	return fmt.Sprintf("%s %s %s returned HTTP %d", e.Label, e.Method, e.Path, e.StatusCode)
+	return message
 }
 
 func New(cfg Config) (*Client, error) {

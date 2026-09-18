@@ -13,21 +13,23 @@ import (
 )
 
 type Config struct {
-	Name     string
-	BaseURL  string
-	Login    string
-	APIKey   string
-	MaxLimit int
-	HTTP     *fetch.Client
+	Name           string
+	BaseURL        string
+	Login          string
+	APIKey         string
+	MaxLimit       int
+	CredentialEnvs []string
+	HTTP           *fetch.Client
 }
 
 type Client struct {
-	name     string
-	baseURL  string
-	login    string
-	apiKey   string
-	maxLimit int
-	http     *fetch.Client
+	name       string
+	baseURL    string
+	login      string
+	apiKey     string
+	maxLimit   int
+	credential []string
+	http       *fetch.Client
 }
 
 func New(cfg Config) *Client {
@@ -42,12 +44,13 @@ func New(cfg Config) *Client {
 	}
 
 	return &Client{
-		name:     name,
-		baseURL:  strings.TrimRight(cfg.BaseURL, "/"),
-		login:    cfg.Login,
-		apiKey:   cfg.APIKey,
-		maxLimit: maxLimit,
-		http:     cfg.HTTP,
+		name:       name,
+		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
+		login:      cfg.Login,
+		apiKey:     cfg.APIKey,
+		maxLimit:   maxLimit,
+		credential: cfg.CredentialEnvs,
+		http:       cfg.HTTP,
 	}
 }
 
@@ -60,8 +63,10 @@ func (c *Client) Capabilities() booru.Capabilities {
 }
 
 func (c *Client) Search(ctx context.Context, params booru.SearchParams) ([]booru.Post, error) {
+	terms := c.searchTerms(params)
+
 	query := url.Values{}
-	query.Set("tags", c.searchTerms(params))
+	query.Set("tags", terms)
 	query.Set("limit", strconv.Itoa(c.limit(params.Limit)))
 
 	if params.Page > 1 {
@@ -72,7 +77,7 @@ func (c *Client) Search(ctx context.Context, params booru.SearchParams) ([]booru
 
 	raw, err := fetch.GetJSON[[]postJSON](ctx, c.http, c.name, "/posts.json", query)
 	if err != nil {
-		return nil, err
+		return nil, c.searchError(err, terms)
 	}
 
 	posts := make([]booru.Post, 0, len(raw))
@@ -86,7 +91,7 @@ func (c *Client) Search(ctx context.Context, params booru.SearchParams) ([]booru
 func (c *Client) Post(ctx context.Context, id string) (booru.Post, error) {
 	raw, err := fetch.GetJSON[postJSON](ctx, c.http, c.name, "/posts/"+url.PathEscape(id)+".json", nil)
 	if err != nil {
-		return booru.Post{}, err
+		return booru.Post{}, c.apiError(err)
 	}
 
 	return c.toPost(raw), nil
@@ -109,7 +114,7 @@ func (c *Client) SearchTags(ctx context.Context, query booru.TagQuery) ([]booru.
 
 	raw, err := fetch.GetJSON[[]tagJSON](ctx, c.http, c.name, "/tags.json", params)
 	if err != nil {
-		return nil, err
+		return nil, c.apiError(err)
 	}
 
 	tags := make([]booru.Tag, 0, len(raw))
@@ -137,7 +142,7 @@ func (c *Client) PopularTags(ctx context.Context, query booru.PopularQuery) ([]b
 
 	raw, err := fetch.GetJSON[[]tagJSON](ctx, c.http, c.name, "/tags.json", params)
 	if err != nil {
-		return nil, err
+		return nil, c.apiError(err)
 	}
 
 	tags := make([]booru.Tag, 0, len(raw))
@@ -162,7 +167,7 @@ func (c *Client) RelatedTags(ctx context.Context, query booru.RelatedQuery) ([]b
 
 	raw, err := fetch.GetJSON[relatedResponse](ctx, c.http, c.name, "/related_tag.json", params)
 	if err != nil {
-		return nil, err
+		return nil, c.apiError(err)
 	}
 
 	tags := make([]booru.RelatedTag, 0, len(raw.RelatedTags))
@@ -204,7 +209,7 @@ func (c *Client) searchTerms(params booru.SearchParams) string {
 }
 
 func (c *Client) auth(params url.Values) {
-	if c.login != "" && c.apiKey != "" {
+	if c.authenticated() {
 		params.Set("login", c.login)
 		params.Set("api_key", c.apiKey)
 	}

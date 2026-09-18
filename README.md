@@ -36,6 +36,9 @@ it returns an empty result with the reason.
 `rule34` (rule34.xxx) and `xbooru` (xbooru.com) apply country and region restrictions, so either may refuse requests
 or be unreachable depending on where the server runs.
 
+`danbooru` allows an unauthenticated search only 2 terms, and negated tags and `order:random` count toward that limit
+while `rating:` does not. Setting `DANBOORU_LOGIN` and `DANBOORU_API_KEY` raises it for a Gold account.
+
 ## Usage
 
 Deploy as a Docker image:
@@ -68,11 +71,11 @@ This server aggregates third-party NSFW APIs. The defaults are convenient, not s
 
 - NSFW is the default.
 - You are responsible for what you serve.
-  - Adult material and age verification are regulated per jurisdiction, and `BLOCKED_TAGS` ships empty by design.
+    - Adult material and age verification are regulated per jurisdiction, and `BLOCKED_TAGS` ships empty by design.
 - Filtering is best-effort.
-  - Applied as query terms where supported and as a post-fetch filter otherwise.
+    - Applied as query terms where supported and as a post-fetch filter otherwise.
 - Content is third-party and unreviewed.
-  - This project neither controls nor vets any tag, post, or URL it returns.
+    - This project neither controls nor vets any tag, post, or URL it returns.
 
 Also this was, at time of writing, nearly 100% vibe coded with a decent planning phase. Diligence and testing along
 with a small surface area of functionality make it safe to use, in our opinion. Work may be done to go over the code

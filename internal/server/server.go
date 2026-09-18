@@ -205,12 +205,13 @@ func buildProvider(spec config.ClientSpec, cfg config.Config, transport *fetch.C
 	switch spec.Family {
 	case config.FamilyDanbooru:
 		return danbooru.New(danbooru.Config{
-			Name:     spec.Name,
-			BaseURL:  cfg.ClientURL(spec.Name),
-			Login:    cred(spec.OptionalCreds, 0),
-			APIKey:   cred(spec.OptionalCreds, 1),
-			MaxLimit: cfg.MaxLimit,
-			HTTP:     transport,
+			Name:           spec.Name,
+			BaseURL:        cfg.ClientURL(spec.Name),
+			Login:          cred(spec.OptionalCreds, 0),
+			APIKey:         cred(spec.OptionalCreds, 1),
+			MaxLimit:       cfg.MaxLimit,
+			CredentialEnvs: spec.OptionalCreds,
+			HTTP:           transport,
 		}), nil
 	case config.FamilyGelbooru:
 		return gelbooru.New(gelbooru.Config{
