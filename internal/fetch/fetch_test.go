@@ -188,7 +188,7 @@ func TestNonRetryableStatus(t *testing.T) {
 
 	limiter := &countingLimiter{}
 
-	_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, limiter), "e621", "/posts.json", nil)
+	_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, limiter), "danbooru", "/posts.json", nil)
 	if err == nil {
 		t.Fatal("GetJSON() error = nil, want an error")
 	}

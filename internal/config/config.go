@@ -13,111 +13,65 @@ import (
 	"github.com/wishmatic/booru-mcp/internal/booru"
 )
 
-const DefaultUserAgent = "booru-mcp/0.1.0"
-
 const (
 	danbooruURL    = "https://danbooru.donmai.us"
-	aibooruURL     = "https://aibooru.online"
 	gelbooruURL    = "https://gelbooru.com"
 	rule34URL      = "https://rule34.xxx"
-	realbooruURL   = "https://realbooru.com"
 	xbooruURL      = "https://xbooru.com"
-	tbibURL        = "https://tbib.org"
 	safebooruURL   = "https://safebooru.org"
 	yandereURL     = "https://yande.re"
 	konachanURL    = "https://konachan.com"
 	sakugabooruURL = "https://sakugabooru.com"
-	e621URL        = "https://e621.net"
-	e926URL        = "https://e926.net"
-	derpibooruURL  = "https://derpibooru.org"
-	twibooruURL    = "https://twibooru.org"
-	furbooruURL    = "https://furbooru.org"
 )
 
 type Family string
 
 const (
-	FamilyDanbooru  Family = "danbooru"
-	FamilyGelbooru  Family = "gelbooru"
-	FamilyMoebooru  Family = "moebooru"
-	FamilyE621      Family = "e621"
-	FamilyPhilomena Family = "philomena"
+	FamilyDanbooru Family = "danbooru"
+	FamilyGelbooru Family = "gelbooru"
+	FamilyMoebooru Family = "moebooru"
 )
 
 // URLEnv is the envar that may override DefaultURL, and is empty for sites whose address is always the same. Only
 // konachan has one, because konachan.net is the SFW mirror of konachan.com.
 type ClientSpec struct {
-	Name              string
-	Family            Family
-	DefaultURL        string
-	URLEnv            string
-	RequiredCreds     []string
-	OptionalCreds     []string
-	InDefault         bool
-	RequiresUserAgent bool
+	Name          string
+	Family        Family
+	DefaultURL    string
+	URLEnv        string
+	RequiredCreds []string
+	OptionalCreds []string
 }
 
 var clientSpecs = []ClientSpec{
 	{
 		Name: "danbooru", Family: FamilyDanbooru, DefaultURL: danbooruURL,
-		OptionalCreds: []string{"DANBOORU_LOGIN", "DANBOORU_API_KEY"}, InDefault: true,
-	},
-	{
-		Name: "aibooru", Family: FamilyDanbooru, DefaultURL: aibooruURL,
-		OptionalCreds: []string{"AIBOORU_LOGIN", "AIBOORU_API_KEY"},
+		OptionalCreds: []string{"DANBOORU_LOGIN", "DANBOORU_API_KEY"},
 	},
 	{
 		Name: "gelbooru", Family: FamilyGelbooru, DefaultURL: gelbooruURL,
-		RequiredCreds: []string{"GELBOORU_API_KEY", "GELBOORU_USER_ID"}, InDefault: true,
+		RequiredCreds: []string{"GELBOORU_API_KEY", "GELBOORU_USER_ID"},
 	},
 	{
 		Name: "rule34", Family: FamilyGelbooru, DefaultURL: rule34URL,
-		RequiredCreds: []string{"RULE34_API_KEY", "RULE34_USER_ID"}, InDefault: true,
-	},
-	{
-		Name: "realbooru", Family: FamilyGelbooru, DefaultURL: realbooruURL,
-		RequiredCreds: []string{"REALBOORU_API_KEY", "REALBOORU_USER_ID"}, InDefault: true,
+		RequiredCreds: []string{"RULE34_API_KEY", "RULE34_USER_ID"},
 	},
 	{
 		Name: "xbooru", Family: FamilyGelbooru, DefaultURL: xbooruURL,
-		RequiredCreds: []string{"XBOORU_API_KEY", "XBOORU_USER_ID"}, InDefault: true,
+		RequiredCreds: []string{"XBOORU_API_KEY", "XBOORU_USER_ID"},
 	},
 	{
-		Name: "tbib", Family: FamilyGelbooru, DefaultURL: tbibURL,
-		RequiredCreds: []string{"TBIB_API_KEY", "TBIB_USER_ID"}, InDefault: true,
+		Name: "safebooru", Family: FamilyGelbooru, DefaultURL: safebooruURL,
 	},
 	{
-		Name: "safebooru", Family: FamilyGelbooru, DefaultURL: safebooruURL, InDefault: true,
-	},
-	{
-		Name: "yandere", Family: FamilyMoebooru, DefaultURL: yandereURL, InDefault: true,
+		Name: "yandere", Family: FamilyMoebooru, DefaultURL: yandereURL,
 	},
 	{
 		Name: "konachan", Family: FamilyMoebooru, DefaultURL: konachanURL,
-		URLEnv: "KONACHAN_URL", InDefault: true,
+		URLEnv: "KONACHAN_URL",
 	},
 	{
-		Name: "sakugabooru", Family: FamilyMoebooru, DefaultURL: sakugabooruURL, InDefault: true,
-	},
-	{
-		Name: "e621", Family: FamilyE621, DefaultURL: e621URL,
-		OptionalCreds: []string{"E621_LOGIN", "E621_API_KEY"}, InDefault: true, RequiresUserAgent: true,
-	},
-	{
-		Name: "e926", Family: FamilyE621, DefaultURL: e926URL,
-		OptionalCreds: []string{"E926_LOGIN", "E926_API_KEY"}, RequiresUserAgent: true,
-	},
-	{
-		Name: "derpibooru", Family: FamilyPhilomena, DefaultURL: derpibooruURL,
-		RequiredCreds: []string{"DERPIBOORU_API_KEY"}, InDefault: true,
-	},
-	{
-		Name: "twibooru", Family: FamilyPhilomena, DefaultURL: twibooruURL,
-		RequiredCreds: []string{"TWIBOORU_API_KEY"}, InDefault: true,
-	},
-	{
-		Name: "furbooru", Family: FamilyPhilomena, DefaultURL: furbooruURL,
-		RequiredCreds: []string{"FURBOORU_API_KEY"}, InDefault: true,
+		Name: "sakugabooru", Family: FamilyMoebooru, DefaultURL: sakugabooruURL,
 	},
 }
 
@@ -188,17 +142,8 @@ func (c Config) Env(name string) string {
 
 func (c Config) EnabledClients() []string {
 	raw := strings.TrimSpace(c.Clients)
-	if raw == "" {
-		return defaultClientNames()
-	}
-
-	if strings.EqualFold(raw, "all") {
-		names := make([]string, 0, len(clientSpecs))
-		for _, spec := range clientSpecs {
-			names = append(names, spec.Name)
-		}
-
-		return names
+	if raw == "" || strings.EqualFold(raw, "all") {
+		return allClientNames()
 	}
 
 	return splitList(raw)
@@ -238,10 +183,6 @@ func (c Config) ClientActive(name string) (bool, string) {
 
 	if len(missing) > 0 {
 		return false, fmt.Sprintf("%s requires credentials that are not set: %s", name, strings.Join(missing, ", "))
-	}
-
-	if spec.RequiresUserAgent && c.UserAgent == DefaultUserAgent {
-		return false, fmt.Sprintf("%s requires a descriptive USER_AGENT with contact information", name)
 	}
 
 	return true, ""
@@ -344,13 +285,11 @@ func (c Config) Validate() error {
 	return nil
 }
 
-func defaultClientNames() []string {
+func allClientNames() []string {
 	names := make([]string, 0, len(clientSpecs))
 
 	for _, spec := range clientSpecs {
-		if spec.InDefault {
-			names = append(names, spec.Name)
-		}
+		names = append(names, spec.Name)
 	}
 
 	return names

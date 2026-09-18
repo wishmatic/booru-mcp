@@ -91,15 +91,15 @@ func TestRelatedKeepsClientsSeparate(t *testing.T) {
 		},
 	}
 	second := &relatedProvider{
-		fakeProvider: &fakeProvider{name: "e621"},
+		fakeProvider: &fakeProvider{name: "gelbooru"},
 		relatedFn: func(booru.RelatedQuery) ([]booru.RelatedTag, error) {
 			return []booru.RelatedTag{relatedTag("blue_eyes", 800)}, nil
 		},
 	}
 
-	service := newTestService(t, Options{MaxLimit: 10, CacheTTL: 0, DefaultClients: []string{"danbooru", "e621"}},
+	service := newTestService(t, Options{MaxLimit: 10, CacheTTL: 0, DefaultClients: []string{"danbooru", "gelbooru"}},
 		testEntry{name: "danbooru", provider: first},
-		testEntry{name: "e621", provider: second},
+		testEntry{name: "gelbooru", provider: second},
 	)
 
 	result, err := service.Related(context.Background(), RelatedInput{Tag: "smile"})
@@ -111,8 +111,8 @@ func TestRelatedKeepsClientsSeparate(t *testing.T) {
 		t.Fatalf("Tags = %+v, want both clients' rows kept separately", result.Tags)
 	}
 
-	if result.Tags[0].Client != "danbooru" || result.Tags[1].Client != "e621" {
-		t.Errorf("clients = %q, %q, want danbooru then e621", result.Tags[0].Client, result.Tags[1].Client)
+	if result.Tags[0].Client != "danbooru" || result.Tags[1].Client != "gelbooru" {
+		t.Errorf("clients = %q, %q, want danbooru then gelbooru", result.Tags[0].Client, result.Tags[1].Client)
 	}
 }
 

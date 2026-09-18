@@ -52,8 +52,8 @@ share an adapter, because they are separate corpora with separate credentials.
 **Danbooru family** (`internal/danbooru`). Endpoints `/posts.json`, `/posts/<id>.json`, `/tags.json`,
 `/related_tag.json`. Exact work counts via `search[order]=count`.
 
-| Client    | Default URL                  | Credentials                                    | Notes                                               |
-| --------- | ---------------------------- | ---------------------------------------------- | --------------------------------------------------- |
+| Client     | Default URL                  | Credentials                                    | Notes                                               |
+| ---------- | ---------------------------- | ---------------------------------------------- | --------------------------------------------------- |
 | `danbooru` | `https://danbooru.donmai.us` | optional `DANBOORU_LOGIN` + `DANBOORU_API_KEY` | Mixed SFW and NSFW; the richest tag API.            |
 | `aibooru`  | `https://aibooru.online`     | optional `AIBOORU_LOGIN` + `AIBOORU_API_KEY`   | AI-generated corpus; excluded from the default set. |
 
@@ -61,51 +61,51 @@ share an adapter, because they are separate corpora with separate credentials.
 `index.php?page=dapi&s=post&q=index&json=1` and `...&s=tag&q=index&json=1&orderby=count`. The credential requirement is
 a property of each site, not the protocol, so each client carries its own key.
 
-| Client      | Default URL             | Credentials                                | Notes                                                       |
-| ----------- | ----------------------- | ------------------------------------------ | ----------------------------------------------------------- |
-| `gelbooru`  | `https://gelbooru.com`  | `GELBOORU_API_KEY` + `GELBOORU_USER_ID`    | Largest general booru; both required.                       |
-| `rule34`    | `https://rule34.xxx`    | `RULE34_API_KEY` + `RULE34_USER_ID`        | Adult-only; both required.                                  |
-| `realbooru` | `https://realbooru.com` | `REALBOORU_API_KEY` + `REALBOORU_USER_ID`  | Photo-oriented adult; both required.                        |
-| `xbooru`    | `https://xbooru.com`    | `XBOORU_API_KEY` + `XBOORU_USER_ID`        | Adult; requirement confirmed in Unit 6.                     |
-| `tbib`      | `https://tbib.org`      | `TBIB_API_KEY` + `TBIB_USER_ID`            | The Big ImageBoard; requirement confirmed in Unit 6.        |
-| `safebooru` | `https://safebooru.org` | none                                       | SFW; the family's only keyless member.                      |
+| Client      | Default URL             | Credentials                               | Notes                                                |
+| ----------- | ----------------------- | ----------------------------------------- | ---------------------------------------------------- |
+| `gelbooru`  | `https://gelbooru.com`  | `GELBOORU_API_KEY` + `GELBOORU_USER_ID`   | Largest general booru; both required.                |
+| `rule34`    | `https://rule34.xxx`    | `RULE34_API_KEY` + `RULE34_USER_ID`       | Adult-only; both required.                           |
+| `realbooru` | `https://realbooru.com` | `REALBOORU_API_KEY` + `REALBOORU_USER_ID` | Photo-oriented adult; both required.                 |
+| `xbooru`    | `https://xbooru.com`    | `XBOORU_API_KEY` + `XBOORU_USER_ID`       | Adult; requirement confirmed in Unit 6.              |
+| `tbib`      | `https://tbib.org`      | `TBIB_API_KEY` + `TBIB_USER_ID`           | The Big ImageBoard; requirement confirmed in Unit 6. |
+| `safebooru` | `https://safebooru.org` | none                                      | SFW; the family's only keyless member.               |
 
 **Moebooru family** (`internal/moebooru`). Endpoints `/post.json`, `/tag.json`, plus `/post/popular_recent.json`.
 Keyless.
 
-| Client        | Default URL              | Credentials | Notes                                                        |
-| ------------- | ------------------------ | ----------- | ------------------------------------------------------------ |
-| `yandere`     | `https://yande.re`       | none        | High-resolution anime art.                                    |
-| `konachan`    | `https://konachan.com`   | none        | Questionable and explicit content. `konachan.net` is the SFW mirror; set `KONACHAN_URL` to use it instead. |
-| `sakugabooru` | `https://sakugabooru.com` | none       | Video clips with rich tags; SFW.                              |
+| Client        | Default URL               | Credentials | Notes                                                                                                      |
+| ------------- | ------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------- |
+| `yandere`     | `https://yande.re`        | none        | High-resolution anime art.                                                                                 |
+| `konachan`    | `https://konachan.com`    | none        | Questionable and explicit content. `konachan.net` is the SFW mirror; set `KONACHAN_URL` to use it instead. |
+| `sakugabooru` | `https://sakugabooru.com` | none        | Video clips with rich tags; SFW.                                                                           |
 
 **e621 family** (`internal/e621`). Endpoints `/posts.json`, `/tags.json`, `/related_tag.json`. Requires a descriptive
 `USER_AGENT`; the site rejects requests without one.
 
-| Client | Default URL        | Credentials                                                     | Notes                                              |
-| ------ | ------------------ | -------------------------------------------------------------- | -------------------------------------------------- |
-| `e621` | `https://e621.net` | optional `E621_LOGIN` + `E621_API_KEY`; `USER_AGENT` required   | Furry; adult by default.                            |
-| `e926` | `https://e926.net` | optional `E926_LOGIN` + `E926_API_KEY`; `USER_AGENT` required   | SFW mirror of `e621`; excluded from the default set because combining mirrors double counts. |
+| Client | Default URL        | Credentials                                                   | Notes                                                                                        |
+| ------ | ------------------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `e621` | `https://e621.net` | optional `E621_LOGIN` + `E621_API_KEY`; `USER_AGENT` required | Furry; adult by default.                                                                     |
+| `e926` | `https://e926.net` | optional `E926_LOGIN` + `E926_API_KEY`; `USER_AGENT` required | SFW mirror of `e621`; excluded from the default set because combining mirrors double counts. |
 
 **Philomena family** (`internal/philomena`). Endpoints `/api/v1/json/search/posts?q=`, `/api/v1/json/search/tags?q=`.
 Tag records carry image counts, which map onto the same work-count field as the other families.
 
 | Client       | Default URL              | Credentials          | Notes                                         |
 | ------------ | ------------------------ | -------------------- | --------------------------------------------- |
-| `derpibooru` | `https://derpibooru.org` | `DERPIBOORU_API_KEY` | Pony; uses named filters rather than ratings.  |
-| `twibooru`   | `https://twibooru.org`   | `TWIBOORU_API_KEY`   | Philomena fork; adult content allowed.         |
-| `furbooru`   | `https://furbooru.org`   | `FURBOORU_API_KEY`   | Furry.                                         |
+| `derpibooru` | `https://derpibooru.org` | `DERPIBOORU_API_KEY` | Pony; uses named filters rather than ratings. |
+| `twibooru`   | `https://twibooru.org`   | `TWIBOORU_API_KEY`   | Philomena fork; adult content allowed.        |
+| `furbooru`   | `https://furbooru.org`   | `FURBOORU_API_KEY`   | Furry.                                        |
 
 **Deliberately excluded**, with the reason, so the list is defensible and complete:
 
-| Site                            | Reason                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------- |
+| Site                            | Reason                                                                     |
+| ------------------------------- | -------------------------------------------------------------------------- |
 | `chan.sankakucomplex.com`       | API is auth-gated and not openly documented; revisit only if that changes. |
-| `rule34.paheal.net`             | Shimmie engine; no JSON API.                                              |
-| `www.zerochan.net`              | No public API.                                                            |
-| `e-hentai.org` / `exhentai.org` | No API; access is cookie and session based.                               |
-| `nhentai.net`                   | No official API; only unofficial clients.                                 |
-| `www.pixiv.net`                 | No public API, and it is not a booru.                                     |
+| `rule34.paheal.net`             | Shimmie engine; no JSON API.                                               |
+| `www.zerochan.net`              | No public API.                                                             |
+| `e-hentai.org` / `exhentai.org` | No API; access is cookie and session based.                                |
+| `nhentai.net`                   | No official API; only unofficial clients.                                  |
+| `www.pixiv.net`                 | No public API, and it is not a booru.                                      |
 
 Every client is named, registered, referenced, cached, and reported under its site key. Adding a Hashbooru site is a
 one-line addition to the family's client table, not a new adapter.
@@ -143,13 +143,13 @@ Every tool takes `clients`, an optional list of client names. When omitted, the 
 `rule34,danbooru,gelbooru` out of the box. Clients that are unknown error; clients that are known but inactive are
 skipped in a combined call and reported when named alone.
 
-| Tool      | Purpose                              | Cache               | Clients                    |
-| --------- | ------------------------------------ | ------------------- | -------------------------- |
-| `popular` | Popular tags from many clients       | tag cache           | list, default set          |
-| `tags`    | Tag search sorted by popularity      | tag cache           | list, default set          |
-| `related` | Tags that co-occur with a tag        | related-tag cache   | capable clients only       |
-| `search`  | Post (image) search by tags          | none                | list, default set          |
-| `get`     | One post with everything on it       | none                | single client, `danbooru`  |
+| Tool      | Purpose                         | Cache             | Clients                   |
+| --------- | ------------------------------- | ----------------- | ------------------------- |
+| `popular` | Popular tags from many clients  | tag cache         | list, default set         |
+| `tags`    | Tag search sorted by popularity | tag cache         | list, default set         |
+| `related` | Tags that co-occur with a tag   | related-tag cache | capable clients only      |
+| `search`  | Post (image) search by tags     | none              | list, default set         |
+| `get`     | One post with everything on it  | none              | single client, `danbooru` |
 
 `popular` inputs: `clients`, `category` (optional enum), `limit` (optional, default 25), `refresh` (optional bool).
 Output: each tag with its category, fused score, and a per-client breakdown of count, rank, and percentage.
@@ -302,31 +302,31 @@ narrow it; the mechanism is the same in both directions.
 Envar naming is `<SITE>_*`, uppercased from the client name, for every named client. Each client also accepts a
 `<SITE>_URL` override; the defaults are the URLs in the client tables. Credentials are per site and never logged.
 
-| Envar                     | Default                        | Meaning                                                          |
-| ------------------------- | ------------------------------ | ---------------------------------------------------------------- |
-| `BOORU_CLIENTS`           | see below                      | Comma-separated clients to enable, or `all` for every client.    |
-| `DEFAULT_CLIENTS`         | `rule34,danbooru,gelbooru`     | Clients used when a call does not name any.                      |
-| `USER_AGENT`              | `booru-mcp/0.1.0`              | Sent on every upstream request. A non-default value is required for `e621` and `e926`. |
-| `RATE_LIMIT_RPS`          | `1`                            | Global outbound calls per second, shared by all clients.          |
-| `RATE_LIMIT_BURST`        | `1`                            | Burst above the sustained rate.                                  |
-| `REQUEST_TIMEOUT_SECONDS` | `20`                           | Per-attempt upstream timeout.                                    |
-| `MAX_LIMIT`               | `100`                          | Hard cap on results returned by any call.                        |
-| `CACHE_TTL_DAYS`          | `30`                           | Tag staleness threshold in days; `0` disables caching.           |
-| `DB_PATH`                 | `booru-mcp.db`                 | SQLite path; `/data/booru-mcp.db` in Docker.                     |
-| `CONTENT_RATING`          | `all`                          | Highest rating any tool may return; `all` means uncapped.        |
-| `BLOCKED_TAGS`            | unset                          | Comma-separated tags excluded from queries and results; ships empty. |
-| `DANBOORU_LOGIN`, `DANBOORU_API_KEY`     | unset | Danbooru credentials; both or neither.               |
-| `AIBOORU_LOGIN`, `AIBOORU_API_KEY`       | unset | Aibooru credentials; both or neither.                |
-| `GELBOORU_API_KEY`, `GELBOORU_USER_ID`   | unset | Gelbooru credentials; both required.                 |
-| `RULE34_API_KEY`, `RULE34_USER_ID`       | unset | Rule34 credentials; both required.                   |
-| `REALBOORU_API_KEY`, `REALBOORU_USER_ID` | unset | Realbooru credentials; both required.                |
-| `XBOORU_API_KEY`, `XBOORU_USER_ID`       | unset | Xbooru credentials; requirement confirmed in Unit 6. |
-| `TBIB_API_KEY`, `TBIB_USER_ID`           | unset | TBIB credentials; requirement confirmed in Unit 6.   |
-| `E621_LOGIN`, `E621_API_KEY`             | unset | e621 credentials; `USER_AGENT` is the hard requirement. |
-| `E926_LOGIN`, `E926_API_KEY`             | unset | e926 credentials; `USER_AGENT` is the hard requirement. |
-| `DERPIBOORU_API_KEY`                     | unset | Derpibooru API key.                                  |
-| `TWIBOORU_API_KEY`                       | unset | Twibooru API key.                                    |
-| `FURBOORU_API_KEY`                       | unset | Furbooru API key.                                    |
+| Envar                                    | Default                    | Meaning                                                                                |
+| ---------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------- |
+| `BOORU_CLIENTS`                          | see below                  | Comma-separated clients to enable, or `all` for every client.                          |
+| `DEFAULT_CLIENTS`                        | `rule34,danbooru,gelbooru` | Clients used when a call does not name any.                                            |
+| `USER_AGENT`                             | `booru-mcp/0.1.0`          | Sent on every upstream request. A non-default value is required for `e621` and `e926`. |
+| `RATE_LIMIT_RPS`                         | `1`                        | Global outbound calls per second, shared by all clients.                               |
+| `RATE_LIMIT_BURST`                       | `1`                        | Burst above the sustained rate.                                                        |
+| `REQUEST_TIMEOUT_SECONDS`                | `20`                       | Per-attempt upstream timeout.                                                          |
+| `MAX_LIMIT`                              | `100`                      | Hard cap on results returned by any call.                                              |
+| `CACHE_TTL_DAYS`                         | `30`                       | Tag staleness threshold in days; `0` disables caching.                                 |
+| `DB_PATH`                                | `booru-mcp.db`             | SQLite path; `/data/booru-mcp.db` in Docker.                                           |
+| `CONTENT_RATING`                         | `all`                      | Highest rating any tool may return; `all` means uncapped.                              |
+| `BLOCKED_TAGS`                           | unset                      | Comma-separated tags excluded from queries and results; ships empty.                   |
+| `DANBOORU_LOGIN`, `DANBOORU_API_KEY`     | unset                      | Danbooru credentials; both or neither.                                                 |
+| `AIBOORU_LOGIN`, `AIBOORU_API_KEY`       | unset                      | Aibooru credentials; both or neither.                                                  |
+| `GELBOORU_API_KEY`, `GELBOORU_USER_ID`   | unset                      | Gelbooru credentials; both required.                                                   |
+| `RULE34_API_KEY`, `RULE34_USER_ID`       | unset                      | Rule34 credentials; both required.                                                     |
+| `REALBOORU_API_KEY`, `REALBOORU_USER_ID` | unset                      | Realbooru credentials; both required.                                                  |
+| `XBOORU_API_KEY`, `XBOORU_USER_ID`       | unset                      | Xbooru credentials; requirement confirmed in Unit 6.                                   |
+| `TBIB_API_KEY`, `TBIB_USER_ID`           | unset                      | TBIB credentials; requirement confirmed in Unit 6.                                     |
+| `E621_LOGIN`, `E621_API_KEY`             | unset                      | e621 credentials; `USER_AGENT` is the hard requirement.                                |
+| `E926_LOGIN`, `E926_API_KEY`             | unset                      | e926 credentials; `USER_AGENT` is the hard requirement.                                |
+| `DERPIBOORU_API_KEY`                     | unset                      | Derpibooru API key.                                                                    |
+| `TWIBOORU_API_KEY`                       | unset                      | Twibooru API key.                                                                      |
+| `FURBOORU_API_KEY`                       | unset                      | Furbooru API key.                                                                      |
 
 Default `BOORU_CLIENTS` is every non-mirror client: `danbooru`, `gelbooru`, `rule34`, `realbooru`, `xbooru`,
 `tbib`, `safebooru`, `yandere`, `konachan`, `sakugabooru`, `e621`, `derpibooru`, `twibooru`, `furbooru`.
@@ -376,13 +376,13 @@ Owner decisions from the plan review, recorded so later changes do not relitigat
 
 Offered as riffs, not commitments. Each is cheap to add later because the pieces above already exist.
 
-| Addition                       | Shape                                                                            | Why it serves image generation                                                                  |
-| ------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Pooling and popularity windows | Moebooru `/post/popular_recent.json` and Danbooru's rank-based orderings          | A recency-weighted view of popularity that is not the same as all-time counts.                    |
-| Hashbooru sibling coverage     | Additional sites in the existing family table, no new adapter                     | The family already covers the protocol, so coverage grows at near-zero cost.                      |
-| Offline tag cache snapshot     | Optional JSON export and import of `tags`                                          | Lets a deployment seed the cache without a cold, 1 rps warm-up burst across a dozen clients.      |
-| Parent and child post chains   | Danbooru `/posts/<id>.json` parent fields, surfaced as related posts              | Lets a model follow a chain of edits without a second search.                                     |
-| `sankaku` client               | Only if a token-based API becomes documented                                       | It is popular, but it is excluded today because it would mean scraping or reverse engineering.    |
+| Addition                       | Shape                                                                    | Why it serves image generation                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Pooling and popularity windows | Moebooru `/post/popular_recent.json` and Danbooru's rank-based orderings | A recency-weighted view of popularity that is not the same as all-time counts.                 |
+| Hashbooru sibling coverage     | Additional sites in the existing family table, no new adapter            | The family already covers the protocol, so coverage grows at near-zero cost.                   |
+| Offline tag cache snapshot     | Optional JSON export and import of `tags`                                | Lets a deployment seed the cache without a cold, 1 rps warm-up burst across a dozen clients.   |
+| Parent and child post chains   | Danbooru `/posts/<id>.json` parent fields, surfaced as related posts     | Lets a model follow a chain of edits without a second search.                                  |
+| `sankaku` client               | Only if a token-based API becomes documented                             | It is popular, but it is excluded today because it would mean scraping or reverse engineering. |
 
 ## Architecture impact
 

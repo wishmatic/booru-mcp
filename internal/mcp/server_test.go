@@ -104,8 +104,8 @@ func TestRelatedSchemaRestrictsClients(t *testing.T) {
 	srv, err := New(Deps{
 		Log:                   zap.NewNop(),
 		Catalog:               service,
-		RelatedClients:        []string{"danbooru", "aibooru", "e621", "e926"},
-		RelatedDefaultClients: []string{"danbooru", "e621"},
+		RelatedClients:        []string{"danbooru"},
+		RelatedDefaultClients: []string{"danbooru"},
 	})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -144,11 +144,11 @@ func TestRelatedSchemaRestrictsClients(t *testing.T) {
 	}
 
 	enum, ok := items["enum"].([]any)
-	if !ok || len(enum) != 4 {
+	if !ok || len(enum) != 1 {
 		t.Fatalf("clients enum = %#v, want the related-capable clients only", items["enum"])
 	}
 
-	if defaults, ok := clients["default"].([]any); !ok || len(defaults) != 2 {
+	if defaults, ok := clients["default"].([]any); !ok || len(defaults) != 1 {
 		t.Errorf("clients default = %#v, want the capable clients intersected with the default list", clients["default"])
 	}
 }

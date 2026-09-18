@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -20,6 +21,21 @@ func newTestStore(t *testing.T) *Client {
 	t.Cleanup(func() { _ = client.Close() })
 
 	return client
+}
+
+func TestNewCreatesParentDirectory(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "deeper", "test.db")
+
+	client, err := New(path)
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	t.Cleanup(func() { _ = client.Close() })
+
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("Stat() error: %v", err)
+	}
 }
 
 func TestSchemaCreatedAndReopens(t *testing.T) {

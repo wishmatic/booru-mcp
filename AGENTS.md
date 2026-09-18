@@ -73,8 +73,6 @@ flowchart TD
         danbooru["internal/danbooru"]
         gelbooru["internal/gelbooru"]
         moebooru["internal/moebooru"]
-        e621["internal/e621"]
-        philomena["internal/philomena"]
         fetch["internal/fetch"]
         store["internal/store"]
     end
@@ -93,8 +91,6 @@ flowchart TD
     server --> danbooru
     server --> gelbooru
     server --> moebooru
-    server --> e621
-    server --> philomena
     server --> fetch
     server --> store
     server --> auth
@@ -115,10 +111,6 @@ flowchart TD
     gelbooru --> fetch
     moebooru --> booru
     moebooru --> fetch
-    e621 --> booru
-    e621 --> fetch
-    philomena --> booru
-    philomena --> fetch
 
     fetch --> utils
     store --> utils

@@ -219,10 +219,10 @@ func TestSearchCapsLimitAndNarrowsRating(t *testing.T) {
 }
 
 func TestSearchExcludesRatinglessClient(t *testing.T) {
-	provider := &fakeProvider{name: "derpibooru"}
+	provider := &fakeProvider{name: "unrated"}
 
 	service := newTestService(t, Options{MaxLimit: 10, ContentRating: booru.RatingGeneral},
-		testEntry{name: "derpibooru", provider: provider})
+		testEntry{name: "unrated", provider: provider})
 
 	result, err := service.Search(context.Background(), SearchInput{Tags: "x"})
 	if err != nil {
@@ -233,8 +233,8 @@ func TestSearchExcludesRatinglessClient(t *testing.T) {
 		t.Errorf("searchCalls = %d, want 0 for a client that cannot rate-filter", provider.searchCalls)
 	}
 
-	if len(result.Skipped) != 1 || result.Skipped[0].Client != "derpibooru" {
-		t.Errorf("Skipped = %+v, want derpibooru excluded", result.Skipped)
+	if len(result.Skipped) != 1 || result.Skipped[0].Client != "unrated" {
+		t.Errorf("Skipped = %+v, want unrated excluded", result.Skipped)
 	}
 }
 

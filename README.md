@@ -11,8 +11,8 @@ that publish a JSON API. It is NSFW-first: adult clients are enabled by default 
 - `tags` searches tags and returns them sorted by popularity. Popularity is a percentage within the query: each
   client's strongest match is 100%, which is what makes results comparable across sites. Same-name results collapse to
   the highest-percentage instance.
-- `related` returns tags that co-occur with a tag. This is a partial-coverage capability: only the Danbooru and e621
-  families publish a related-tag API, the rest are skipped and reported, and a short or empty result is expected.
+- `related` returns tags that co-occur with a tag. This is a partial-coverage capability: only the Danbooru family
+  publishes a related-tag API, the rest are skipped and reported, and a short or empty result is expected.
 - `search` searches posts by a booru tag string and returns permalinks and file URLs, grouped in the requested client
   order.
 - `get` returns one post with every tag grouped by category, its permalink, source, score, and dimensions.
@@ -24,16 +24,17 @@ that publish a JSON API. It is NSFW-first: adult clients are enabled by default 
 
 ### Clients
 
-| Family    | Clients                                                                        |
-| --------- | ------------------------------------------------------------------------------ |
-| Danbooru  | `danbooru`, `aibooru`                                                           |
-| Gelbooru  | `gelbooru`, `rule34`, `realbooru`, `xbooru`, `tbib`, `safebooru`                |
-| Moebooru  | `yandere`, `konachan`, `sakugabooru`                                            |
-| e621      | `e621`, `e926`                                                                  |
-| Philomena | `derpibooru`, `twibooru`, `furbooru`                                            |
+| Family   | Clients                                     |
+| -------- | ------------------------------------------- |
+| Danbooru | `danbooru`                                  |
+| Gelbooru | `gelbooru`, `rule34`, `xbooru`, `safebooru` |
+| Moebooru | `yandere`, `konachan`, `sakugabooru`        |
 
 A client whose credentials are unset never fails startup; it is inactive and contributes nothing, and a call that names
 it returns an empty result with the reason.
+
+`rule34` (rule34.xxx) and `xbooru` (xbooru.com) apply country and region restrictions, so either may refuse requests
+or be unreachable depending on where the server runs.
 
 ## Usage
 
@@ -67,12 +68,11 @@ This server aggregates third-party NSFW APIs. The defaults are convenient, not s
 
 - NSFW is the default.
 - You are responsible for what you serve.
-    - Adult material and age verification are regulated per jurisdiction, and `BLOCKED_TAGS` ships empty by design.
+  - Adult material and age verification are regulated per jurisdiction, and `BLOCKED_TAGS` ships empty by design.
 - Filtering is best-effort.
-    - Applied as query terms where supported and as a post-fetch filter otherwise.
-    - Clients that publish no rating metadata are excluded wholesale, not filtered.
+  - Applied as query terms where supported and as a post-fetch filter otherwise.
 - Content is third-party and unreviewed.
-    - This project neither controls nor vets any tag, post, or URL it returns.
+  - This project neither controls nor vets any tag, post, or URL it returns.
 
 Also this was, at time of writing, nearly 100% vibe coded with a decent planning phase. Diligence and testing along
 with a small surface area of functionality make it safe to use, in our opinion. Work may be done to go over the code
@@ -82,6 +82,6 @@ to comphrend, improve, and re-architect it.
 
 Booru MCP is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
 
-This project is not affiliated with or endorsed by Danbooru, Aibooru, Gelbooru, rule34.xxx, Realbooru, Xbooru, TBIB,
-Safebooru, yande.re, Konachan, Sakugabooru, e621, e926, Derpibooru, Twibooru, Furbooru, or any other third-party
-service. Those names are trademarks of their respective owners and are used here only to describe compatibility.
+This project is not affiliated with or endorsed by Danbooru, Gelbooru, rule34.xxx, Xbooru, Safebooru, yande.re,
+Konachan, Sakugabooru, or any other third-party service. Those names are trademarks of their respective owners and are
+used here only to describe compatibility.

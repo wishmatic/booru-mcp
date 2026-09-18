@@ -35,7 +35,7 @@ func testConfig(t *testing.T) config.Config {
 
 	for _, key := range []string{
 		"KONACHAN_URL", "DANBOORU_LOGIN", "DANBOORU_API_KEY",
-		"RULE34_API_KEY", "RULE34_USER_ID", "E621_LOGIN", "E621_API_KEY",
+		"RULE34_API_KEY", "RULE34_USER_ID",
 	} {
 		t.Setenv(key, "")
 	}
@@ -46,7 +46,7 @@ func testConfig(t *testing.T) config.Config {
 		APIKey:                "server-key",
 		Clients:               "danbooru",
 		DefaultClientsRaw:     "danbooru",
-		UserAgent:             config.DefaultUserAgent,
+		UserAgent:             "booru-mcp/0.1.0",
 		RateLimitRPS:          1,
 		RateLimitBurst:        1,
 		RequestTimeoutSeconds: 20,

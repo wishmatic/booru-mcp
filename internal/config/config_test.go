@@ -36,7 +36,7 @@ func testConfig(t *testing.T) Config {
 	return Config{
 		APIKey:                "key",
 		DefaultClientsRaw:     "rule34,danbooru,gelbooru",
-		UserAgent:             DefaultUserAgent,
+		UserAgent:             "booru-mcp/0.1.0",
 		RateLimitRPS:          1,
 		RateLimitBurst:        1,
 		RequestTimeoutSeconds: 20,
@@ -52,13 +52,18 @@ func TestEnabledClientsDefault(t *testing.T) {
 
 	enabled := cfg.EnabledClients()
 
-	if len(enabled) != len(clientSpecs)-2 {
-		t.Fatalf("EnabledClients() = %d clients, want %d", len(enabled), len(clientSpecs)-2)
+	if len(enabled) != len(clientSpecs) {
+		t.Fatalf("EnabledClients() = %d clients, want the full roster of %d", len(enabled), len(clientSpecs))
 	}
 
+	enabledSet := make(map[string]bool, len(enabled))
 	for _, name := range enabled {
-		if name == "aibooru" || name == "e926" {
-			t.Errorf("EnabledClients() contains %q, want the mirror and side corpora excluded by default", name)
+		enabledSet[name] = true
+	}
+
+	for _, name := range []string{"danbooru", "gelbooru", "rule34", "xbooru", "safebooru", "yandere", "konachan", "sakugabooru"} {
+		if !enabledSet[name] {
+			t.Errorf("EnabledClients() is missing %q", name)
 		}
 	}
 }
@@ -86,6 +91,16 @@ func TestDefaultClients(t *testing.T) {
 
 	if got := cfg.DefaultClients(); len(got) != 3 || got[0] != "rule34" || got[1] != "danbooru" || got[2] != "gelbooru" {
 		t.Fatalf("DefaultClients() = %v, want [rule34 danbooru gelbooru]", got)
+	}
+}
+
+func TestRemovedClientsAreUnknown(t *testing.T) {
+	removed := []string{"aibooru", "realbooru", "tbib", "e621", "e926", "derpibooru", "twibooru", "furbooru"}
+
+	for _, name := range removed {
+		if _, ok := ClientSpecByName(name); ok {
+			t.Errorf("ClientSpecByName(%q) found a client that should be removed", name)
+		}
 	}
 }
 
@@ -244,22 +259,6 @@ func TestClientActiveReasonHidesSecrets(t *testing.T) {
 
 	if strings.Contains(reason, "super-secret-value") {
 		t.Fatalf("reason %q leaks a credential", reason)
-	}
-}
-
-func TestClientActiveUserAgent(t *testing.T) {
-	cfg := testConfig(t)
-	t.Setenv("E621_LOGIN", "")
-	t.Setenv("E621_API_KEY", "")
-
-	if active, reason := cfg.ClientActive("e621"); active || !strings.Contains(reason, "USER_AGENT") {
-		t.Fatalf("ClientActive(e621) = %v, %q, want inactive naming USER_AGENT", active, reason)
-	}
-
-	cfg.UserAgent = "booru-mcp contact@example.com"
-
-	if active, reason := cfg.ClientActive("e621"); !active {
-		t.Fatalf("ClientActive(e621) = false, %q, want active with a custom User-Agent", reason)
 	}
 }
 

@@ -18,12 +18,10 @@ import (
 	"github.com/wishmatic/booru-mcp/internal/catalog"
 	"github.com/wishmatic/booru-mcp/internal/config"
 	"github.com/wishmatic/booru-mcp/internal/danbooru"
-	"github.com/wishmatic/booru-mcp/internal/e621"
 	"github.com/wishmatic/booru-mcp/internal/fetch"
 	"github.com/wishmatic/booru-mcp/internal/gelbooru"
 	mcpServer "github.com/wishmatic/booru-mcp/internal/mcp"
 	"github.com/wishmatic/booru-mcp/internal/moebooru"
-	"github.com/wishmatic/booru-mcp/internal/philomena"
 	"github.com/wishmatic/booru-mcp/internal/store"
 )
 
@@ -168,7 +166,10 @@ func buildClients(cfg config.Config, log *zap.Logger) (*booru.Registry, []string
 			return nil, nil, fmt.Errorf("client %s: %w", name, err)
 		}
 
-		provider := buildProvider(spec, cfg, transport)
+		provider, err := buildProvider(spec, cfg, transport)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		if err := registry.Register(name, provider, ""); err != nil {
 			return nil, nil, err
@@ -184,7 +185,7 @@ func buildClients(cfg config.Config, log *zap.Logger) (*booru.Registry, []string
 	return registry, related, nil
 }
 
-func buildProvider(spec config.ClientSpec, cfg config.Config, transport *fetch.Client) booru.Provider {
+func buildProvider(spec config.ClientSpec, cfg config.Config, transport *fetch.Client) (booru.Provider, error) {
 	cred := func(envs []string, index int) string {
 		if index >= len(envs) {
 			return ""
@@ -202,7 +203,7 @@ func buildProvider(spec config.ClientSpec, cfg config.Config, transport *fetch.C
 			APIKey:   cred(spec.OptionalCreds, 1),
 			MaxLimit: cfg.MaxLimit,
 			HTTP:     transport,
-		})
+		}), nil
 	case config.FamilyGelbooru:
 		return gelbooru.New(gelbooru.Config{
 			Name:           spec.Name,
@@ -212,31 +213,16 @@ func buildProvider(spec config.ClientSpec, cfg config.Config, transport *fetch.C
 			MaxLimit:       cfg.MaxLimit,
 			CredentialEnvs: spec.RequiredCreds,
 			HTTP:           transport,
-		})
+		}), nil
 	case config.FamilyMoebooru:
 		return moebooru.New(moebooru.Config{
 			Name:     spec.Name,
 			BaseURL:  cfg.ClientURL(spec.Name),
 			MaxLimit: cfg.MaxLimit,
 			HTTP:     transport,
-		})
-	case config.FamilyE621:
-		return e621.New(e621.Config{
-			Name:     spec.Name,
-			BaseURL:  cfg.ClientURL(spec.Name),
-			Login:    cred(spec.OptionalCreds, 0),
-			APIKey:   cred(spec.OptionalCreds, 1),
-			MaxLimit: cfg.MaxLimit,
-			HTTP:     transport,
-		})
+		}), nil
 	default:
-		return philomena.New(philomena.Config{
-			Name:     spec.Name,
-			BaseURL:  cfg.ClientURL(spec.Name),
-			APIKey:   cred(spec.RequiredCreds, 0),
-			MaxLimit: cfg.MaxLimit,
-			HTTP:     transport,
-		})
+		return nil, fmt.Errorf("client %s: unsupported family %q", spec.Name, spec.Family)
 	}
 }
 

@@ -3,6 +3,8 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
@@ -43,6 +45,10 @@ type Client struct {
 }
 
 func New(path string) (*Client, error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return nil, fmt.Errorf("store: create directory for %s: %w", path, err)
+	}
+
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("store: open %s: %w", path, err)
@@ -54,7 +60,7 @@ func New(path string) (*Client, error) {
 	if err := db.QueryRow("PRAGMA journal_mode=WAL").Scan(&journalMode); err != nil {
 		_ = db.Close()
 
-		return nil, fmt.Errorf("store: enable WAL: %w", err)
+		return nil, fmt.Errorf("store: enable WAL on %s (parent directory must exist and be writable): %w", path, err)
 	}
 
 	if _, err := db.Exec(schema); err != nil {
