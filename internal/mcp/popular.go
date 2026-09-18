@@ -20,9 +20,10 @@ type popularInput struct {
 }
 
 type popularOutput struct {
-	Tags     []tagOutput     `json:"tags"`
-	Skipped  []skippedOutput `json:"skipped,omitempty"`
-	Warnings []string        `json:"warnings,omitempty"`
+	Tags     []tagOutput          `json:"tags"`
+	Skipped  []skippedOutput      `json:"skipped,omitempty"`
+	Warnings []string             `json:"warnings,omitempty"`
+	Clients  []clientStatusOutput `json:"clients,omitempty"`
 }
 
 func registerPopular(srv *mcp.Server, h *handlers) {
@@ -70,11 +71,16 @@ func (h *handlers) popular(
 		Tags:     toTagOutputs(result.Tags),
 		Skipped:  toSkippedOutputs(result.Skipped),
 		Warnings: result.Warnings,
+		Clients:  toClientStatusOutputs(result.Clients),
 	}
 
 	text := present.Popular(result.Tags)
 
 	if note := present.Skipped(result.Skipped); note != "" {
+		text += "\n" + note
+	}
+
+	if note := present.ClientStatuses(result.Clients); note != "" {
 		text += "\n" + note
 	}
 

@@ -273,6 +273,63 @@ func TestClientActiveReasonHidesSecrets(t *testing.T) {
 	}
 }
 
+func TestRule34UsesAPIHost(t *testing.T) {
+	cfg := testConfig(t)
+
+	if got := cfg.ClientURL("rule34"); got != "https://api.rule34.xxx" {
+		t.Errorf("ClientURL(rule34) = %q, want the API host", got)
+	}
+}
+
+func TestDanbooruTagLimitByTier(t *testing.T) {
+	tests := map[string]struct {
+		tier        string
+		credentials bool
+		wantLimit   int
+		wantTier    string
+	}{
+		"auto anonymous":     {tier: "auto", wantLimit: 2, wantTier: "anonymous"},
+		"auto authenticated": {tier: "auto", credentials: true, wantLimit: 6, wantTier: "gold"},
+		"member":             {tier: "member", wantLimit: 2, wantTier: "member"},
+		"gold":               {tier: "gold", wantLimit: 6, wantTier: "gold"},
+		"platinum":           {tier: "platinum", wantLimit: 0, wantTier: "platinum"},
+		"builder":            {tier: "builder", wantLimit: 0, wantTier: "builder"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := testConfig(t)
+			cfg.DanbooruTierRaw = tt.tier
+
+			t.Setenv("DANBOORU_LOGIN", "")
+			t.Setenv("DANBOORU_API_KEY", "")
+
+			if tt.credentials {
+				t.Setenv("DANBOORU_LOGIN", "someone")
+				t.Setenv("DANBOORU_API_KEY", "secret")
+			}
+
+			if got := cfg.DanbooruTagLimit(); got != tt.wantLimit {
+				t.Errorf("DanbooruTagLimit() = %d, want %d", got, tt.wantLimit)
+			}
+
+			if got := cfg.ResolvedDanbooruTier(); got != tt.wantTier {
+				t.Errorf("ResolvedDanbooruTier() = %q, want %q", got, tt.wantTier)
+			}
+		})
+	}
+}
+
+func TestValidateDanbooruTier(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.DanbooruTierRaw = "diamond"
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "DANBOORU_TIER") {
+		t.Fatalf("Validate() error = %v, want it to name DANBOORU_TIER", err)
+	}
+}
+
 func TestAddrAndVerboseErrors(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.Host = "127.0.0.1"

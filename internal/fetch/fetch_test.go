@@ -3,6 +3,7 @@ package fetch
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -245,6 +246,100 @@ func TestContextDeadline(t *testing.T) {
 
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("error = %v, want it to wrap context.DeadlineExceeded", err)
+	}
+}
+
+func TestNonJSONBodyIsATypedBodyError(t *testing.T) {
+	tests := map[string]struct {
+		contentType string
+		body        string
+		wantReason  string
+		wantBody    string
+	}{
+		"html":        {contentType: "text/html", body: "<html>Access Restricted</html>", wantReason: "HTML", wantBody: "Access Restricted"},
+		"xml":         {contentType: "text/xml", body: "<tags type=\"array\"></tags>", wantReason: "HTML or XML", wantBody: "<tags"},
+		"json string": {contentType: "application/json", body: `"Missing authentication. Go to api.rule34.xxx for more information"`, wantReason: "upstream message", wantBody: "Missing authentication"},
+		"plain text":  {contentType: "text/plain", body: "404 page not found", wantReason: "non-JSON", wantBody: "404 page not found"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", tt.contentType)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			t.Cleanup(server.Close)
+
+			_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, &countingLimiter{}), "rule34", "/index.php", nil)
+			if err == nil {
+				t.Fatal("GetJSON() error = nil, want a body error")
+			}
+
+			var bodyErr *BodyError
+			if !errors.As(err, &bodyErr) {
+				t.Fatalf("error = %v, want a *BodyError", err)
+			}
+
+			if bodyErr.StatusCode != http.StatusOK {
+				t.Errorf("StatusCode = %d, want 200", bodyErr.StatusCode)
+			}
+
+			for _, want := range []string{"rule34", "/index.php", "200", tt.wantReason, tt.wantBody} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not contain %q", err.Error(), want)
+				}
+			}
+		})
+	}
+}
+
+func TestLargeJSONBodyDecodesInFull(t *testing.T) {
+	items := make([]string, 0, 200)
+
+	for i := 0; i < 200; i++ {
+		items = append(items, fmt.Sprintf(`{"id":%d,"tags":"alpha beta gamma delta epsilon zeta eta theta"}`, i))
+	}
+
+	body := "[" + strings.Join(items, ",") + "]"
+	if len(body) <= maxBodyExcerpt {
+		t.Fatalf("fixture is %d bytes, want it above the %d-byte excerpt bound", len(body), maxBodyExcerpt)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(server.Close)
+
+	posts, err := GetJSON[[]map[string]any](context.Background(), newTestClient(t, server.URL, &countingLimiter{}), "danbooru", "/posts.json", nil)
+	if err != nil {
+		t.Fatalf("GetJSON() error: %v, want a large body to decode in full", err)
+	}
+
+	if len(posts) != 200 {
+		t.Errorf("posts = %d, want 200", len(posts))
+	}
+}
+
+func TestWrongShapeDecodesAsBodyError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`["not", "an", "object"]`))
+	}))
+	t.Cleanup(server.Close)
+
+	_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, &countingLimiter{}), "gelbooru", "/index.php", nil)
+	if err == nil {
+		t.Fatal("GetJSON() error = nil, want a body error")
+	}
+
+	var bodyErr *BodyError
+	if !errors.As(err, &bodyErr) {
+		t.Fatalf("error = %v, want a *BodyError", err)
+	}
+
+	if !strings.Contains(err.Error(), "expected JSON shape") {
+		t.Errorf("error = %q, want it to describe the shape mismatch", err.Error())
 	}
 }
 

@@ -1,10 +1,12 @@
 package fetch
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,9 +16,10 @@ import (
 )
 
 const (
-	maxAttempts = 3
-	baseBackoff = 250 * time.Millisecond
-	maxBackoff  = 2 * time.Second
+	maxAttempts    = 3
+	baseBackoff    = 250 * time.Millisecond
+	maxBackoff     = 2 * time.Second
+	maxBodyExcerpt = 4 * 1024
 )
 
 type Limiter interface {
@@ -46,6 +49,33 @@ type HTTPError struct {
 	StatusCode int
 	Status     string
 	Body       string
+}
+
+// BodyError is a 200 response whose body is not the JSON document the caller asked for. It exists so a block page, a
+// redirect to HTML, or an upstream message string is diagnosed instead of surfacing as a Go type error.
+type BodyError struct {
+	Label       string
+	Path        string
+	StatusCode  int
+	ContentType string
+	Body        string
+	Reason      string
+}
+
+func (e *BodyError) Error() string {
+	message := fmt.Sprintf("%s %s returned HTTP %d", e.Label, e.Path, e.StatusCode)
+
+	if contentType := mediaType(e.ContentType); contentType != "" {
+		message += " (" + contentType + ")"
+	}
+
+	message += " with " + e.Reason
+
+	if e.Body != "" {
+		message += ": " + e.Body
+	}
+
+	return message
 }
 
 func (e *HTTPError) Error() string {
@@ -108,11 +138,77 @@ func GetJSONWithHeaders[T any](ctx context.Context, c *Client, label, path strin
 
 	defer resp.Body.Close()
 
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return out, fmt.Errorf("%s: decode %s response: %w", label, path, err)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return out, fmt.Errorf("%s: read %s response: %w", label, path, err)
+	}
+
+	trimmed := bytes.TrimSpace(body)
+
+	if reason, ok := rejectBody(trimmed); ok {
+		return out, c.bodyError(label, path, resp, excerpt(trimmed), reason)
+	}
+
+	if err := json.Unmarshal(trimmed, &out); err != nil {
+		reason := fmt.Sprintf("a body that does not decode as the expected JSON shape (%v)", err)
+
+		return out, c.bodyError(label, path, resp, excerpt(trimmed), reason)
 	}
 
 	return out, nil
+}
+
+func excerpt(body []byte) string {
+	if len(body) > maxBodyExcerpt {
+		return string(body[:maxBodyExcerpt])
+	}
+
+	return string(body)
+}
+
+// rejectBody reports whether a body cannot be a JSON document for these APIs, before any unmarshal is attempted.
+func rejectBody(body []byte) (string, bool) {
+	if len(body) == 0 {
+		return "an empty body", true
+	}
+
+	switch body[0] {
+	case '<':
+		return "an HTML or XML body, not JSON", true
+
+	case '"':
+		var message string
+		if json.Unmarshal(body, &message) == nil && message != "" {
+			return "an upstream message instead of a JSON document", true
+		}
+
+		return "a JSON string body, not a JSON document", true
+
+	case '{', '[':
+		return "", false
+
+	default:
+		return "a non-JSON body", true
+	}
+}
+
+func (c *Client) bodyError(label, path string, resp *http.Response, body, reason string) *BodyError {
+	return &BodyError{
+		Label:       label,
+		Path:        path,
+		StatusCode:  resp.StatusCode,
+		ContentType: resp.Header.Get("Content-Type"),
+		Body:        body,
+		Reason:      reason,
+	}
+}
+
+func mediaType(contentType string) string {
+	if idx := strings.IndexByte(contentType, ';'); idx >= 0 {
+		return strings.TrimSpace(contentType[:idx])
+	}
+
+	return strings.TrimSpace(contentType)
 }
 
 func (c *Client) get(ctx context.Context, label, path string, query url.Values, headers http.Header) (*http.Response, error) {

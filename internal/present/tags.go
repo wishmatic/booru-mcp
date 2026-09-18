@@ -49,7 +49,7 @@ func Related(tags []booru.RelatedTag, skipped []booru.Skipped) string {
 			"API, so an empty or short result is expected rather than a failure.\n")
 	} else {
 		for _, tag := range tags {
-			fmt.Fprintf(&b, "- %s (%s): score %d\n", tag.Tag, tag.Client, tag.Score)
+			fmt.Fprintf(&b, "- %s (%s): score %g\n", tag.Tag, tag.Client, tag.Score)
 		}
 
 		b.WriteString("Related tags are only available from clients with a related-tag API, so this list may be shorter " +

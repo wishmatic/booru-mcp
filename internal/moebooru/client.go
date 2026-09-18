@@ -49,7 +49,7 @@ func (c *Client) Name() string {
 }
 
 func (c *Client) Capabilities() booru.Capabilities {
-	return booru.Capabilities{Rating: true}
+	return booru.Capabilities{Rating: true, Random: true}
 }
 
 func (c *Client) Search(ctx context.Context, params booru.SearchParams) ([]booru.Post, error) {
@@ -166,7 +166,7 @@ func toTags(raw []tagJSON) []booru.Tag {
 }
 
 func searchTerms(params booru.SearchParams) string {
-	parts := make([]string, 0, len(params.Exclude)+2)
+	parts := make([]string, 0, len(params.Exclude)+3)
 
 	if trimmed := strings.TrimSpace(params.Tags); trimmed != "" {
 		parts = append(parts, trimmed)
@@ -180,6 +180,10 @@ func searchTerms(params booru.SearchParams) string {
 		if tag := booru.NormalizeTag(exclude); tag != "" {
 			parts = append(parts, "-"+tag)
 		}
+	}
+
+	if params.Random {
+		parts = append(parts, "order:random")
 	}
 
 	return strings.Join(parts, " ")

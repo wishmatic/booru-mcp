@@ -41,6 +41,13 @@ type skippedOutput struct {
 	Reason string `json:"reason"`
 }
 
+type clientStatusOutput struct {
+	Client  string `json:"client"`
+	Status  string `json:"status"`
+	Results int    `json:"results,omitempty"`
+	Detail  string `json:"detail,omitempty"`
+}
+
 type postOutput struct {
 	Client     string              `json:"client"`
 	ID         string              `json:"id"`
@@ -81,6 +88,21 @@ func toTagOutputs(tags []booru.FusedTag) []tagOutput {
 		}
 
 		out = append(out, entry)
+	}
+
+	return out
+}
+
+func toClientStatusOutputs(statuses []booru.ClientStatus) []clientStatusOutput {
+	out := make([]clientStatusOutput, 0, len(statuses))
+
+	for _, status := range statuses {
+		out = append(out, clientStatusOutput{
+			Client:  status.Client,
+			Status:  string(status.State),
+			Results: status.Results,
+			Detail:  status.Detail,
+		})
 	}
 
 	return out

@@ -20,6 +20,7 @@ type TagsResult struct {
 	Tags     []booru.FusedTag
 	Skipped  []booru.Skipped
 	Warnings []string
+	Clients  []booru.ClientStatus
 }
 
 func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error) {
@@ -34,6 +35,7 @@ func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error)
 	var (
 		sets      []tagSet
 		warnings  []string
+		statuses  = skippedStatuses(resolution.skipped)
 		lastErr   error
 		successes int
 	)
@@ -43,15 +45,17 @@ func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error)
 		if err != nil {
 			lastErr = err
 			warnings = append(warnings, fmt.Sprintf("%s: %v", entry.Name, err))
+			statuses = append(statuses, errorStatus(entry.Name, err))
 
 			continue
 		}
 
 		successes++
 		sets = append(sets, tagSet{Client: entry.Name, Tags: tags})
+		statuses = append(statuses, okStatus(entry.Name, len(tags), ""))
 	}
 
-	result := TagsResult{Skipped: resolution.skipped, Warnings: warnings}
+	result := TagsResult{Skipped: resolution.skipped, Warnings: warnings, Clients: statuses}
 
 	if len(resolution.active) > 0 && successes == 0 && lastErr != nil {
 		return result, fmt.Errorf("catalog: all clients failed: %w", lastErr)

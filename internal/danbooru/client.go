@@ -2,6 +2,7 @@ package danbooru
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -17,6 +18,8 @@ type Config struct {
 	BaseURL        string
 	Login          string
 	APIKey         string
+	TagLimit       int
+	Tier           string
 	MaxLimit       int
 	CredentialEnvs []string
 	HTTP           *fetch.Client
@@ -27,6 +30,8 @@ type Client struct {
 	baseURL    string
 	login      string
 	apiKey     string
+	tagLimit   int
+	tier       string
 	maxLimit   int
 	credential []string
 	http       *fetch.Client
@@ -48,6 +53,8 @@ func New(cfg Config) *Client {
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
 		login:      cfg.Login,
 		apiKey:     cfg.APIKey,
+		tagLimit:   cfg.TagLimit,
+		tier:       cfg.Tier,
 		maxLimit:   maxLimit,
 		credential: cfg.CredentialEnvs,
 		http:       cfg.HTTP,
@@ -64,6 +71,10 @@ func (c *Client) Capabilities() booru.Capabilities {
 
 func (c *Client) Search(ctx context.Context, params booru.SearchParams) ([]booru.Post, error) {
 	terms := c.searchTerms(params)
+
+	if err := c.validateTagLimit(terms); err != nil {
+		return nil, err
+	}
 
 	query := url.Values{}
 	query.Set("tags", terms)
@@ -172,12 +183,17 @@ func (c *Client) RelatedTags(ctx context.Context, query booru.RelatedQuery) ([]b
 
 	tags := make([]booru.RelatedTag, 0, len(raw.RelatedTags))
 
-	for i, item := range raw.RelatedTags {
+	for _, item := range raw.RelatedTags {
+		name := booru.NormalizeTag(item.Tag.Name)
+		if name == "" {
+			continue
+		}
+
 		tags = append(tags, booru.RelatedTag{
-			Tag:    booru.NormalizeTag(item.Tag),
+			Tag:    name,
 			Client: c.name,
 			Score:  item.Frequency,
-			Rank:   i + 1,
+			Rank:   len(tags) + 1,
 		})
 	}
 
@@ -317,10 +333,35 @@ type tagJSON struct {
 	PostCount int    `json:"post_count"`
 }
 
+// Danbooru's related_tag endpoint wraps each related tag in a full tag object; older payloads used a bare string.
+type relatedTagRef struct {
+	Name string
+}
+
+func (t *relatedTagRef) UnmarshalJSON(data []byte) error {
+	var name string
+	if json.Unmarshal(data, &name) == nil {
+		t.Name = name
+
+		return nil
+	}
+
+	var object struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.Unmarshal(data, &object); err != nil {
+		return fmt.Errorf("related tag: %w", err)
+	}
+
+	t.Name = object.Name
+
+	return nil
+}
+
 type relatedJSON struct {
-	Tag          string `json:"tag"`
-	Frequency    int    `json:"frequency"`
-	CoOccurrence int    `json:"co_occurrence"`
+	Tag       relatedTagRef `json:"tag"`
+	Frequency float64       `json:"frequency"`
 }
 
 type relatedResponse struct {

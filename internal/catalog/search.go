@@ -16,10 +16,21 @@ type SearchInput struct {
 	Random  bool
 }
 
+const randomNotAppliedReason = "random ordering not applied: the client does not support it"
+
 type SearchResult struct {
 	Posts    []booru.Post
 	Skipped  []booru.Skipped
 	Warnings []string
+	Clients  []booru.ClientStatus
+}
+
+func randomDetail(entry booru.Entry, requested bool) string {
+	if requested && !entry.Provider.Capabilities().Random {
+		return randomNotAppliedReason
+	}
+
+	return ""
 }
 
 func (s *Service) Search(ctx context.Context, input SearchInput) (SearchResult, error) {
@@ -35,6 +46,7 @@ func (s *Service) Search(ctx context.Context, input SearchInput) (SearchResult, 
 		posts     []booru.Post
 		skipped   = resolution.skipped
 		warnings  []string
+		statuses  = skippedStatuses(resolution.skipped)
 		lastErr   error
 		queried   int
 		successes int
@@ -43,6 +55,7 @@ func (s *Service) Search(ctx context.Context, input SearchInput) (SearchResult, 
 	for _, entry := range resolution.active {
 		if !s.clientAllowed(entry, rating) {
 			skipped = append(skipped, booru.Skipped{Client: entry.Name, Reason: noRatingFilterReason})
+			statuses = append(statuses, skippedStatus(entry.Name, noRatingFilterReason))
 
 			continue
 		}
@@ -60,15 +73,18 @@ func (s *Service) Search(ctx context.Context, input SearchInput) (SearchResult, 
 		if err != nil {
 			lastErr = err
 			warnings = append(warnings, fmt.Sprintf("%s: %v", entry.Name, err))
+			statuses = append(statuses, errorStatus(entry.Name, err))
 
 			continue
 		}
 
 		successes++
-		posts = append(posts, s.filterPosts(clientPosts, rating)...)
+		filtered := s.filterPosts(clientPosts, rating)
+		posts = append(posts, filtered...)
+		statuses = append(statuses, okStatus(entry.Name, len(filtered), randomDetail(entry, input.Random)))
 	}
 
-	result := SearchResult{Posts: posts, Skipped: skipped, Warnings: warnings}
+	result := SearchResult{Posts: posts, Skipped: skipped, Warnings: warnings, Clients: statuses}
 
 	if queried > 0 && successes == 0 && lastErr != nil {
 		return result, fmt.Errorf("catalog: all clients failed: %w", lastErr)

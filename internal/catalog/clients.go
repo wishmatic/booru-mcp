@@ -11,6 +11,28 @@ type resolution struct {
 	skipped []booru.Skipped
 }
 
+func okStatus(client string, results int, detail string) booru.ClientStatus {
+	return booru.ClientStatus{Client: client, State: booru.ClientStateOK, Results: results, Detail: detail}
+}
+
+func errorStatus(client string, err error) booru.ClientStatus {
+	return booru.ClientStatus{Client: client, State: booru.ClientStateError, Detail: err.Error()}
+}
+
+func skippedStatus(client, reason string) booru.ClientStatus {
+	return booru.ClientStatus{Client: client, State: booru.ClientStateSkipped, Detail: reason}
+}
+
+func skippedStatuses(skipped []booru.Skipped) []booru.ClientStatus {
+	out := make([]booru.ClientStatus, 0, len(skipped))
+
+	for _, entry := range skipped {
+		out = append(out, skippedStatus(entry.Client, entry.Reason))
+	}
+
+	return out
+}
+
 func (s *Service) resolve(requested []string) (resolution, error) {
 	names := requested
 	if len(names) == 0 {

@@ -1,7 +1,9 @@
 package gelbooru
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -128,7 +130,7 @@ func (c *Client) PopularTags(ctx context.Context, query booru.PopularQuery) ([]b
 		return nil, err
 	}
 
-	return c.toTags(raw.Tag), nil
+	return c.toPopularTags(raw.Tag), nil
 }
 
 func (c *Client) base(section string) url.Values {
@@ -203,11 +205,29 @@ func (c *Client) toTags(raw []tagJSON) []booru.Tag {
 	tags := make([]booru.Tag, 0, len(raw))
 
 	for _, item := range raw {
-		tags = append(tags, booru.Tag{
-			Name:     booru.NormalizeTag(item.Name),
-			Category: tagCategory(item.code()),
-			Count:    item.Count,
-		})
+		name := booru.NormalizeTag(item.Name)
+		if name == "" {
+			continue
+		}
+
+		tags = append(tags, booru.Tag{Name: name, Category: tagCategory(item.code()), Count: item.Count})
+	}
+
+	return tags
+}
+
+// Hashbooru's count ordering is dominated by deprecated alias stubs with inflated counts, so the popular snapshot drops
+// them; a name search may still surface one as a normal tag result.
+func (c *Client) toPopularTags(raw []tagJSON) []booru.Tag {
+	tags := make([]booru.Tag, 0, len(raw))
+
+	for _, item := range raw {
+		name := booru.NormalizeTag(item.Name)
+		if name == "" || item.deprecated() {
+			continue
+		}
+
+		tags = append(tags, booru.Tag{Name: name, Category: tagCategory(item.code()), Count: item.Count})
 	}
 
 	return tags
@@ -218,15 +238,36 @@ func getJSON[T any](ctx context.Context, c *Client, values url.Values) (T, error
 
 	raw, err := fetch.GetJSON[T](ctx, c.http, c.name, "/index.php", values)
 	if err != nil {
-		var httpErr *fetch.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusUnauthorized {
-			return raw, fmt.Errorf("%s: authentication failed; check %s", c.name, strings.Join(c.credential, ", "))
-		}
-
-		return raw, err
+		return raw, c.translateError(err)
 	}
 
 	return raw, nil
+}
+
+func (c *Client) translateError(err error) error {
+	var httpErr *fetch.HTTPError
+	if errors.As(err, &httpErr) {
+		if httpErr.StatusCode == http.StatusUnauthorized {
+			return fmt.Errorf("%s: authentication failed; check %s", c.name, c.credentialList())
+		}
+
+		return err
+	}
+
+	var bodyErr *fetch.BodyError
+	if errors.As(err, &bodyErr) && strings.Contains(strings.ToLower(bodyErr.Body), "authentication") {
+		return fmt.Errorf("%s: authentication required; set %s", c.name, c.credentialList())
+	}
+
+	return err
+}
+
+func (c *Client) credentialList() string {
+	if len(c.credential) == 0 {
+		return "the client's credentials"
+	}
+
+	return strings.Join(c.credential, ", ")
 }
 
 // Gelbooru's post payload carries one space-separated tag string with no categories, so post tags are recorded as
@@ -244,8 +285,30 @@ func postTags(value string) []booru.Tag {
 	return tags
 }
 
+const deprecatedTagType = 6
+
 type postResponse struct {
 	Post []postJSON `json:"post"`
+}
+
+// Most Hashbooru sites use the envelope, but Safebooru returns a bare array for the same request.
+func (r *postResponse) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var posts []postJSON
+		if err := json.Unmarshal(trimmed, &posts); err != nil {
+			return err
+		}
+
+		r.Post = posts
+
+		return nil
+	}
+
+	type envelope postResponse
+
+	return json.Unmarshal(data, (*envelope)(r))
 }
 
 type tagResponse struct {
@@ -279,4 +342,8 @@ func (t tagJSON) code() int {
 	}
 
 	return t.Type
+}
+
+func (t tagJSON) deprecated() bool {
+	return t.code() == deprecatedTagType
 }

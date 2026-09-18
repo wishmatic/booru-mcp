@@ -16,7 +16,7 @@ import (
 const (
 	danbooruURL    = "https://danbooru.donmai.us"
 	gelbooruURL    = "https://gelbooru.com"
-	rule34URL      = "https://rule34.xxx"
+	rule34URL      = "https://api.rule34.xxx"
 	xbooruURL      = "https://xbooru.com"
 	safebooruURL   = "https://safebooru.org"
 	yandereURL     = "https://yande.re"
@@ -103,6 +103,7 @@ type Config struct {
 	Clients           string `env:"BOORU_CLIENTS"`
 	DefaultClientsRaw string `env:"DEFAULT_CLIENTS" envDefault:"rule34,danbooru,gelbooru"`
 	UserAgent         string `env:"USER_AGENT" envDefault:"booru-mcp/0.1.0"`
+	DanbooruTierRaw   string `env:"DANBOORU_TIER" envDefault:"auto"`
 
 	RateLimitRPS          float64 `env:"RATE_LIMIT_RPS" envDefault:"1"`
 	RateLimitBurst        int     `env:"RATE_LIMIT_BURST" envDefault:"1"`
@@ -204,6 +205,41 @@ func (c Config) BlockedTags() []string {
 	return out
 }
 
+// DanbooruTier is the normalized account tier that determines the per-search tag cap. `auto` means anonymous without
+// credentials and gold with them, which matches what the credential hint has always promised.
+func (c Config) DanbooruTier() string {
+	tier := strings.ToLower(strings.TrimSpace(c.DanbooruTierRaw))
+	if tier == "" {
+		tier = "auto"
+	}
+
+	return tier
+}
+
+func (c Config) ResolvedDanbooruTier() string {
+	tier := c.DanbooruTier()
+	if tier != "auto" {
+		return tier
+	}
+
+	if c.Env("DANBOORU_LOGIN") != "" && c.Env("DANBOORU_API_KEY") != "" {
+		return "gold"
+	}
+
+	return "anonymous"
+}
+
+func (c Config) DanbooruTagLimit() int {
+	switch c.ResolvedDanbooruTier() {
+	case "gold":
+		return 6
+	case "platinum", "builder":
+		return 0
+	default:
+		return 2
+	}
+}
+
 func (c Config) CacheTTL() time.Duration {
 	return time.Duration(c.CacheTTLDays) * 24 * time.Hour
 }
@@ -241,6 +277,10 @@ func (c Config) Validate() error {
 
 	if _, err := c.ContentRating(); err != nil {
 		return err
+	}
+
+	if tier := c.DanbooruTier(); !validDanbooruTier(tier) {
+		return fmt.Errorf("DANBOORU_TIER: %q is not valid; accepted values are %s", tier, danbooruTierValues())
 	}
 
 	enabled := c.EnabledClients()
@@ -305,6 +345,22 @@ func splitList(value string) []string {
 	}
 
 	return out
+}
+
+func validDanbooruTier(tier string) bool {
+	for _, known := range danbooruTiers {
+		if tier == known {
+			return true
+		}
+	}
+
+	return false
+}
+
+var danbooruTiers = []string{"auto", "anonymous", "member", "gold", "platinum", "builder"}
+
+func danbooruTierValues() string {
+	return strings.Join(danbooruTiers, ", ")
 }
 
 func ratingValues() string {

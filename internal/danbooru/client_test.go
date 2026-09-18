@@ -2,6 +2,7 @@ package danbooru
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -272,7 +273,35 @@ func TestMalformedBody(t *testing.T) {
 		t.Fatal("Search() error = nil, want an error")
 	}
 
-	if !strings.Contains(err.Error(), "danbooru") || !strings.Contains(err.Error(), "/posts.json") {
-		t.Errorf("error = %q, want it to name the client and path", err)
+	var bodyErr *fetch.BodyError
+	if !errors.As(err, &bodyErr) {
+		t.Fatalf("error = %v, want a typed *fetch.BodyError", err)
+	}
+
+	if !strings.Contains(err.Error(), "danbooru") || !strings.Contains(err.Error(), "/posts.json") ||
+		!strings.Contains(err.Error(), "non-JSON") {
+		t.Errorf("error = %q, want it to name the client, path, and non-JSON body", err)
+	}
+}
+
+func TestRelatedTagsDecodesTagObjectsAndFloatFrequency(t *testing.T) {
+	client := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"query":"cat_ears","related_tags":[
+			{"tag":{"id":6126,"name":"animal_ears","post_count":1765194},"frequency":1.0},
+			{"tag":{"id":470575,"name":"1girl"},"frequency":0.7134}
+		]}`))
+	})
+
+	tags, err := client.RelatedTags(context.Background(), booru.RelatedQuery{Tag: "cat_ears"})
+	if err != nil {
+		t.Fatalf("RelatedTags() error: %v", err)
+	}
+
+	if len(tags) != 2 || tags[0].Tag != "animal_ears" || tags[0].Score != 1.0 || tags[1].Score != 0.7134 {
+		t.Errorf("tags = %+v, want names and float scores from the tag objects", tags)
+	}
+
+	if tags[0].Rank != 1 || tags[1].Rank != 2 {
+		t.Errorf("ranks = %d, %d, want 1 then 2", tags[0].Rank, tags[1].Rank)
 	}
 }

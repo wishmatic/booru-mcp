@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wishmatic/booru-mcp/internal/booru"
 	"github.com/wishmatic/booru-mcp/internal/catalog"
+	"github.com/wishmatic/booru-mcp/internal/store"
 	"go.uber.org/zap"
 )
 
@@ -42,6 +44,42 @@ func (s *stubProvider) SearchTags(context.Context, booru.TagQuery) ([]booru.Tag,
 
 func (s *stubProvider) PopularTags(context.Context, booru.PopularQuery) ([]booru.Tag, error) {
 	return s.popular, s.err
+}
+
+type testClient struct {
+	name     string
+	provider booru.Provider
+}
+
+func newMultiSession(t *testing.T, clients []testClient, opts catalog.Options) *mcp.ClientSession {
+	t.Helper()
+
+	registry := booru.NewRegistry()
+	names := make([]string, 0, len(clients))
+
+	for _, client := range clients {
+		if err := registry.Register(client.name, client.provider, ""); err != nil {
+			t.Fatalf("Register(%s) error: %v", client.name, err)
+		}
+
+		names = append(names, client.name)
+	}
+
+	db, err := store.New(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("store.New() error: %v", err)
+	}
+
+	t.Cleanup(func() { _ = db.Close() })
+
+	opts.DefaultClients = names
+
+	srv, err := New(Deps{Log: zap.NewNop(), Catalog: catalog.New(registry, db, opts)})
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	return connectSession(t, srv)
 }
 
 func newSession(t *testing.T, provider booru.Provider, opts catalog.Options) *mcp.ClientSession {
@@ -203,6 +241,32 @@ func TestRelatedRejectsClientOutsideEnum(t *testing.T) {
 	result := callTool(t, session, "related", map[string]any{"tag": "smile", "clients": []string{"yandere"}})
 	if !result.IsError {
 		t.Fatal("related with a client outside the enum = nil error, want schema validation to reject it")
+	}
+}
+
+func TestSearchNamesFailingClientAndKeepsOthers(t *testing.T) {
+	healthy := &stubProvider{posts: []booru.Post{{
+		Client: "danbooru", ID: "1", URL: "https://danbooru.donmai.us/posts/1", Rating: booru.RatingGeneral,
+	}}}
+	failing := &stubProvider{err: errors.New("rule34 /index.php returned HTTP 500")}
+
+	session := newMultiSession(t, []testClient{
+		{name: "danbooru", provider: healthy},
+		{name: "rule34", provider: failing},
+		{name: "xbooru", provider: &stubProvider{}},
+	}, catalog.Options{MaxLimit: 100, CacheTTL: 0})
+
+	result := callTool(t, session, "search", map[string]any{"tags": "cat_ears"})
+	if result.IsError {
+		t.Fatalf("search returned an error: %s", textOf(t, result))
+	}
+
+	text := textOf(t, result)
+
+	for _, want := range []string{"danbooru:1", "rule34: error", "HTTP 500", "xbooru: ok (0 results)"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("text = %q, missing %q", text, want)
+		}
 	}
 }
 

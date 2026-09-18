@@ -115,13 +115,30 @@ type FusedTag struct {
 type RelatedTag struct {
 	Tag    string
 	Client string
-	Score  int
+	Score  float64
 	Rank   int
 }
 
 type Skipped struct {
 	Client string
 	Reason string
+}
+
+type ClientState string
+
+const (
+	ClientStateOK      ClientState = "ok"
+	ClientStateError   ClientState = "error"
+	ClientStateSkipped ClientState = "skipped"
+)
+
+// ClientStatus accounts for one requested client on a combined call. A client that succeeded with no results is
+// ClientStateOK with zero Results, which is how it stays distinguishable from one that failed.
+type ClientStatus struct {
+	Client  string
+	State   ClientState
+	Results int
+	Detail  string
 }
 
 func NormalizeTag(value string) string {

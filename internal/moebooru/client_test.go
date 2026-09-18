@@ -2,9 +2,11 @@ package moebooru
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/wishmatic/booru-mcp/internal/booru"
@@ -168,6 +170,48 @@ func TestPostMapping(t *testing.T) {
 
 	if post.CreatedAt.IsZero() {
 		t.Error("CreatedAt = zero, want the epoch parsed")
+	}
+}
+
+func TestSearchSendsRandomOrdering(t *testing.T) {
+	var got url.Values
+
+	client := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Query()
+		_, _ = w.Write([]byte(`[]`))
+	})
+
+	if !client.Capabilities().Random {
+		t.Error("Capabilities().Random = false, want Moebooru random ordering advertised")
+	}
+
+	if _, err := client.Search(context.Background(), booru.SearchParams{Tags: "cat_ears", Random: true}); err != nil {
+		t.Fatalf("Search() error: %v", err)
+	}
+
+	if got.Get("tags") != "cat_ears order:random" {
+		t.Errorf("tags = %q, want order:random appended", got.Get("tags"))
+	}
+}
+
+func TestHTMLBodyIsATypedError(t *testing.T) {
+	client := newTestProvider(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html>nope</html>`))
+	})
+
+	_, err := client.Search(context.Background(), booru.SearchParams{Tags: "x"})
+	if err == nil {
+		t.Fatal("Search() error = nil, want an error")
+	}
+
+	var bodyErr *fetch.BodyError
+	if !errors.As(err, &bodyErr) {
+		t.Fatalf("error = %v, want a typed *fetch.BodyError", err)
+	}
+
+	if !strings.Contains(err.Error(), "HTML") || !strings.Contains(err.Error(), "/post.json") {
+		t.Errorf("error = %q, want it to identify HTML and the path", err.Error())
 	}
 }
 

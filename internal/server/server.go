@@ -209,6 +209,8 @@ func buildProvider(spec config.ClientSpec, cfg config.Config, transport *fetch.C
 			BaseURL:        cfg.ClientURL(spec.Name),
 			Login:          cred(spec.OptionalCreds, 0),
 			APIKey:         cred(spec.OptionalCreds, 1),
+			TagLimit:       cfg.DanbooruTagLimit(),
+			Tier:           cfg.ResolvedDanbooruTier(),
 			MaxLimit:       cfg.MaxLimit,
 			CredentialEnvs: spec.OptionalCreds,
 			HTTP:           transport,

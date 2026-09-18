@@ -20,6 +20,7 @@ type RelatedResult struct {
 	Tags     []booru.RelatedTag
 	Skipped  []booru.Skipped
 	Warnings []string
+	Clients  []booru.ClientStatus
 }
 
 func (s *Service) Related(ctx context.Context, input RelatedInput) (RelatedResult, error) {
@@ -35,6 +36,7 @@ func (s *Service) Related(ctx context.Context, input RelatedInput) (RelatedResul
 		tags      []booru.RelatedTag
 		skipped   = resolution.skipped
 		warnings  []string
+		statuses  = skippedStatuses(resolution.skipped)
 		lastErr   error
 		queried   int
 		successes int
@@ -44,6 +46,7 @@ func (s *Service) Related(ctx context.Context, input RelatedInput) (RelatedResul
 		provider, ok := entry.Provider.(booru.RelatedTagProvider)
 		if !ok {
 			skipped = append(skipped, booru.Skipped{Client: entry.Name, Reason: noRelatedAPIReason})
+			statuses = append(statuses, skippedStatus(entry.Name, noRelatedAPIReason))
 
 			continue
 		}
@@ -54,15 +57,17 @@ func (s *Service) Related(ctx context.Context, input RelatedInput) (RelatedResul
 		if err != nil {
 			lastErr = err
 			warnings = append(warnings, fmt.Sprintf("%s: %v", entry.Name, err))
+			statuses = append(statuses, errorStatus(entry.Name, err))
 
 			continue
 		}
 
 		successes++
 		tags = append(tags, clientTags...)
+		statuses = append(statuses, okStatus(entry.Name, len(clientTags), ""))
 	}
 
-	result := RelatedResult{Skipped: skipped, Warnings: warnings}
+	result := RelatedResult{Skipped: skipped, Warnings: warnings, Clients: statuses}
 
 	if queried > 0 && successes == 0 && lastErr != nil {
 		return result, fmt.Errorf("catalog: all clients failed: %w", lastErr)

@@ -21,9 +21,10 @@ type tagsInput struct {
 }
 
 type tagsOutput struct {
-	Tags     []tagOutput     `json:"tags"`
-	Skipped  []skippedOutput `json:"skipped,omitempty"`
-	Warnings []string        `json:"warnings,omitempty"`
+	Tags     []tagOutput          `json:"tags"`
+	Skipped  []skippedOutput      `json:"skipped,omitempty"`
+	Warnings []string             `json:"warnings,omitempty"`
+	Clients  []clientStatusOutput `json:"clients,omitempty"`
 }
 
 func registerTags(srv *mcp.Server, h *handlers) {
@@ -73,11 +74,16 @@ func (h *handlers) tags(
 		Tags:     toTagOutputs(result.Tags),
 		Skipped:  toSkippedOutputs(result.Skipped),
 		Warnings: result.Warnings,
+		Clients:  toClientStatusOutputs(result.Clients),
 	}
 
 	text := present.Tags(result.Tags)
 
 	if note := present.Skipped(result.Skipped); note != "" {
+		text += "\n" + note
+	}
+
+	if note := present.ClientStatuses(result.Clients); note != "" {
 		text += "\n" + note
 	}
 

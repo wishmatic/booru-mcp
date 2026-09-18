@@ -22,9 +22,10 @@ type searchInput struct {
 }
 
 type searchOutput struct {
-	Posts    []postOutput    `json:"posts"`
-	Skipped  []skippedOutput `json:"skipped,omitempty"`
-	Warnings []string        `json:"warnings,omitempty"`
+	Posts    []postOutput         `json:"posts"`
+	Skipped  []skippedOutput      `json:"skipped,omitempty"`
+	Warnings []string             `json:"warnings,omitempty"`
+	Clients  []clientStatusOutput `json:"clients,omitempty"`
 }
 
 func registerSearch(srv *mcp.Server, h *handlers) {
@@ -76,6 +77,7 @@ func (h *handlers) search(
 		Posts:    make([]postOutput, 0, len(result.Posts)),
 		Skipped:  toSkippedOutputs(result.Skipped),
 		Warnings: result.Warnings,
+		Clients:  toClientStatusOutputs(result.Clients),
 	}
 
 	for _, post := range result.Posts {
@@ -85,6 +87,10 @@ func (h *handlers) search(
 	text := present.Posts(result.Posts)
 
 	if note := present.Skipped(result.Skipped); note != "" {
+		text += "\n" + note
+	}
+
+	if note := present.ClientStatuses(result.Clients); note != "" {
 		text += "\n" + note
 	}
 

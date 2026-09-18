@@ -20,15 +20,16 @@ type relatedInput struct {
 }
 
 type relatedTagOutput struct {
-	Tag    string `json:"tag"`
-	Client string `json:"client"`
-	Score  int    `json:"score"`
+	Tag    string  `json:"tag"`
+	Client string  `json:"client"`
+	Score  float64 `json:"score"`
 }
 
 type relatedOutput struct {
-	Tags     []relatedTagOutput `json:"tags"`
-	Skipped  []skippedOutput    `json:"skipped,omitempty"`
-	Warnings []string           `json:"warnings,omitempty"`
+	Tags     []relatedTagOutput   `json:"tags"`
+	Skipped  []skippedOutput      `json:"skipped,omitempty"`
+	Warnings []string             `json:"warnings,omitempty"`
+	Clients  []clientStatusOutput `json:"clients,omitempty"`
 }
 
 func registerRelated(srv *mcp.Server, h *handlers, capable, defaults []string) {
@@ -71,6 +72,7 @@ func (h *handlers) related(
 	out := relatedOutput{
 		Skipped:  toSkippedOutputs(result.Skipped),
 		Warnings: result.Warnings,
+		Clients:  toClientStatusOutputs(result.Clients),
 	}
 
 	for _, tag := range result.Tags {
@@ -78,6 +80,10 @@ func (h *handlers) related(
 	}
 
 	text := present.Related(result.Tags, result.Skipped)
+
+	if note := present.ClientStatuses(result.Clients); note != "" {
+		text += "\n" + note
+	}
 
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, out, nil
 }

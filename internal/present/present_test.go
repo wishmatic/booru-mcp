@@ -79,22 +79,31 @@ func TestRelatedStatesPartialCoverage(t *testing.T) {
 
 func TestPostsAndPost(t *testing.T) {
 	post := booru.Post{
-		Client:    "danbooru",
-		ID:        "5",
-		URL:       "https://danbooru.donmai.us/posts/5",
-		FileURL:   "https://cdn.example.com/5.png",
-		Width:     800,
-		Height:    600,
-		Rating:    booru.RatingGeneral,
-		Score:     10,
-		FavCount:  3,
-		CreatedAt: time.Unix(1_700_000_000, 0).UTC(),
-		Tags:      []booru.Tag{{Name: "somebody", Category: booru.CategoryArtist}, {Name: "smile", Category: booru.CategoryGeneral}},
+		Client:     "danbooru",
+		ID:         "5",
+		URL:        "https://danbooru.donmai.us/posts/5",
+		FileURL:    "https://cdn.example.com/5.png",
+		SampleURL:  "https://cdn.example.com/5-sample.png",
+		PreviewURL: "https://cdn.example.com/5-preview.png",
+		Width:      800,
+		Height:     600,
+		Rating:     booru.RatingGeneral,
+		Score:      10,
+		FavCount:   3,
+		CreatedAt:  time.Unix(1_700_000_000, 0).UTC(),
+		Tags:       []booru.Tag{{Name: "somebody", Category: booru.CategoryArtist}, {Name: "smile", Category: booru.CategoryGeneral}},
 	}
 
 	list := Posts([]booru.Post{post})
 
-	for _, want := range []string{"danbooru:5", "https://danbooru.donmai.us/posts/5", "800x600", "smile"} {
+	for _, want := range []string{
+		"danbooru:5",
+		"https://danbooru.donmai.us/posts/5",
+		"- file: https://cdn.example.com/5.png",
+		"- preview: https://cdn.example.com/5-preview.png",
+		"800x600",
+		"smile",
+	} {
 		if !strings.Contains(list, want) {
 			t.Errorf("Posts() = %q, missing %q", list, want)
 		}
@@ -102,7 +111,15 @@ func TestPostsAndPost(t *testing.T) {
 
 	detail := Post(post)
 
-	for _, want := range []string{"danbooru:5", "## artist", "## general", "favourites: 3"} {
+	for _, want := range []string{
+		"danbooru:5",
+		"- file: https://cdn.example.com/5.png",
+		"- sample: https://cdn.example.com/5-sample.png",
+		"- preview: https://cdn.example.com/5-preview.png",
+		"## artist",
+		"## general",
+		"favourites: 3",
+	} {
 		if !strings.Contains(detail, want) {
 			t.Errorf("Post() = %q, missing %q", detail, want)
 		}
@@ -110,5 +127,56 @@ func TestPostsAndPost(t *testing.T) {
 
 	if got := Posts(nil); got != "No posts matched." {
 		t.Errorf("Posts(nil) = %q", got)
+	}
+}
+
+func TestMissingURLsAreMarked(t *testing.T) {
+	post := booru.Post{Client: "danbooru", ID: "6850853", URL: "https://danbooru.donmai.us/posts/6850853", Rating: booru.RatingGeneral}
+
+	list := Posts([]booru.Post{post})
+
+	for _, want := range []string{"file URL unavailable for this post", "preview URL unavailable for this post"} {
+		if !strings.Contains(list, want) {
+			t.Errorf("Posts() = %q, missing %q", list, want)
+		}
+	}
+
+	detail := Post(post)
+
+	for _, want := range []string{
+		"file URL unavailable for this post",
+		"sample URL unavailable for this post",
+		"preview URL unavailable for this post",
+	} {
+		if !strings.Contains(detail, want) {
+			t.Errorf("Post() = %q, missing %q", detail, want)
+		}
+	}
+}
+
+func TestClientStatuses(t *testing.T) {
+	out := ClientStatuses([]booru.ClientStatus{
+		{Client: "danbooru", State: booru.ClientStateOK, Results: 3},
+		{Client: "rule34", State: booru.ClientStateError, Detail: "authentication required"},
+		{Client: "xbooru", State: booru.ClientStateSkipped, Detail: "no credentials"},
+		{Client: "gelbooru", State: booru.ClientStateOK, Results: 0, Detail: "random ordering not applied"},
+	})
+
+	for _, want := range []string{
+		"- danbooru: ok (3 results)",
+		"- rule34: error (authentication required)",
+		"- gelbooru: ok (0 results; random ordering not applied)",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("ClientStatuses() = %q, missing %q", out, want)
+		}
+	}
+
+	if strings.Contains(out, "xbooru") {
+		t.Errorf("ClientStatuses() = %q, want skipped clients left to Skipped()", out)
+	}
+
+	if got := ClientStatuses(nil); got != "" {
+		t.Errorf("ClientStatuses(nil) = %q, want empty", got)
 	}
 }

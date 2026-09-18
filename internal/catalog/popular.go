@@ -19,6 +19,7 @@ type PopularResult struct {
 	Tags     []booru.FusedTag
 	Skipped  []booru.Skipped
 	Warnings []string
+	Clients  []booru.ClientStatus
 }
 
 func (s *Service) Popular(ctx context.Context, input PopularInput) (PopularResult, error) {
@@ -32,6 +33,7 @@ func (s *Service) Popular(ctx context.Context, input PopularInput) (PopularResul
 
 	var (
 		warnings  []string
+		statuses  = skippedStatuses(resolution.skipped)
 		lastErr   error
 		successes int
 	)
@@ -41,15 +43,17 @@ func (s *Service) Popular(ctx context.Context, input PopularInput) (PopularResul
 		if err != nil {
 			lastErr = err
 			warnings = append(warnings, fmt.Sprintf("%s: %v", entry.Name, err))
+			statuses = append(statuses, errorStatus(entry.Name, err))
 
 			continue
 		}
 
 		successes++
 		perClient[entry.Name] = tags
+		statuses = append(statuses, okStatus(entry.Name, len(tags), ""))
 	}
 
-	result := PopularResult{Skipped: resolution.skipped, Warnings: warnings}
+	result := PopularResult{Skipped: resolution.skipped, Warnings: warnings, Clients: statuses}
 
 	if len(resolution.active) > 0 && successes == 0 && lastErr != nil {
 		return result, fmt.Errorf("catalog: all clients failed: %w", lastErr)

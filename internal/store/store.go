@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS related_tags (
 	client     TEXT    NOT NULL,
 	name       TEXT    NOT NULL,
 	related    TEXT    NOT NULL,
-	score      INTEGER NOT NULL,
+	score      REAL    NOT NULL,
 	"rank"     INTEGER NOT NULL,
 	fetched_at INTEGER NOT NULL,
 	PRIMARY KEY (client, name, related)

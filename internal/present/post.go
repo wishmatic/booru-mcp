@@ -21,14 +21,8 @@ func Posts(posts []booru.Post) string {
 
 		fmt.Fprintf(&b, "- %s\n", post.Ref())
 		fmt.Fprintf(&b, "  - permalink: %s\n", post.URL)
-
-		if post.FileURL != "" {
-			fmt.Fprintf(&b, "  - file: %s\n", post.FileURL)
-		}
-
-		if post.PreviewURL != "" {
-			fmt.Fprintf(&b, "  - preview: %s\n", post.PreviewURL)
-		}
+		fmt.Fprintf(&b, "  - file: %s\n", fileLine(post.FileURL))
+		fmt.Fprintf(&b, "  - preview: %s\n", previewLine(post.PreviewURL))
 
 		fmt.Fprintf(&b, "  - %dx%d, rating %s, score %d\n", post.Width, post.Height, post.Rating, post.Score)
 
@@ -45,18 +39,9 @@ func Post(post booru.Post) string {
 
 	fmt.Fprintf(&b, "# %s\n\n", post.Ref())
 	fmt.Fprintf(&b, "- permalink: %s\n", post.URL)
-
-	if post.FileURL != "" {
-		fmt.Fprintf(&b, "- file: %s\n", post.FileURL)
-	}
-
-	if post.SampleURL != "" {
-		fmt.Fprintf(&b, "- sample: %s\n", post.SampleURL)
-	}
-
-	if post.PreviewURL != "" {
-		fmt.Fprintf(&b, "- preview: %s\n", post.PreviewURL)
-	}
+	fmt.Fprintf(&b, "- file: %s\n", fileLine(post.FileURL))
+	fmt.Fprintf(&b, "- sample: %s\n", sampleLine(post.SampleURL))
+	fmt.Fprintf(&b, "- preview: %s\n", previewLine(post.PreviewURL))
 
 	fmt.Fprintf(&b, "- %dx%d\n", post.Width, post.Height)
 	fmt.Fprintf(&b, "- rating: %s\n", post.Rating)
@@ -79,6 +64,30 @@ func Post(post booru.Post) string {
 	}
 
 	return strings.TrimRight(b.String(), "\n")
+}
+
+func fileLine(url string) string {
+	if url == "" {
+		return "(file URL unavailable for this post)"
+	}
+
+	return url
+}
+
+func sampleLine(url string) string {
+	if url == "" {
+		return "(sample URL unavailable for this post)"
+	}
+
+	return url
+}
+
+func previewLine(url string) string {
+	if url == "" {
+		return "(preview URL unavailable for this post)"
+	}
+
+	return url
 }
 
 func tagNames(post booru.Post) []string {

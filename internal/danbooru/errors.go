@@ -38,6 +38,55 @@ func (c *Client) searchError(err error, terms string) error {
 	return fmt.Errorf("%s: %s (terms sent: %q%s)", c.name, body.Message, terms, c.tagLimitHint(body))
 }
 
+// validateTagLimit rejects an over-cap search before it reaches Danbooru. Danbooru counts every term except rating:
+// metatags, which is why the count is taken over the terms as they will be sent.
+func (c *Client) validateTagLimit(terms string) error {
+	if c.tagLimit <= 0 {
+		return nil
+	}
+
+	counted := countedTerms(terms)
+	if counted <= c.tagLimit {
+		return nil
+	}
+
+	return fmt.Errorf("%s: %d search terms exceed the %s tag limit of %d (rating: terms are not counted); %s (terms sent: %q)",
+		c.name, counted, c.tierLabel(), c.tagLimit, c.tagLimitAdvice(), terms)
+}
+
+func countedTerms(terms string) int {
+	count := 0
+
+	for _, term := range strings.Fields(terms) {
+		if strings.HasPrefix(term, "rating:") {
+			continue
+		}
+
+		count++
+	}
+
+	return count
+}
+
+func (c *Client) tierLabel() string {
+	if c.tier == "" {
+		return "account"
+	}
+
+	return c.tier
+}
+
+func (c *Client) tagLimitAdvice() string {
+	switch c.tier {
+	case "anonymous", "member":
+		return "set DANBOORU_LOGIN and DANBOORU_API_KEY to raise the limit to 6 with a Gold account"
+	case "gold":
+		return "set DANBOORU_TIER=platinum or builder for unlimited tags"
+	default:
+		return "remove search terms or raise the account tier"
+	}
+}
+
 func (c *Client) tagLimitHint(body apiErrorBody) string {
 	if body.Error != tagLimitError || c.authenticated() || len(c.credential) == 0 {
 		return ""

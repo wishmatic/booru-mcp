@@ -8,7 +8,7 @@ import (
 	"github.com/wishmatic/booru-mcp/internal/booru"
 )
 
-func relatedTag(name string, score int) booru.RelatedTag {
+func relatedTag(name string, score float64) booru.RelatedTag {
 	return booru.RelatedTag{Tag: name, Score: score}
 }
 
