@@ -58,7 +58,6 @@ var clientSpecs = []ClientSpec{
 	},
 	{
 		Name: "xbooru", Family: FamilyGelbooru, DefaultURL: xbooruURL,
-		RequiredCreds: []string{"XBOORU_API_KEY", "XBOORU_USER_ID"},
 	},
 	{
 		Name: "safebooru", Family: FamilyGelbooru, DefaultURL: safebooruURL,

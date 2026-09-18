@@ -247,6 +247,17 @@ func TestClientActiveMissingCredentials(t *testing.T) {
 	}
 }
 
+func TestXbooruNeedsNoCredentials(t *testing.T) {
+	cfg := testConfig(t)
+	unsetEnv(t, "XBOORU_API_KEY")
+	unsetEnv(t, "XBOORU_USER_ID")
+
+	active, reason := cfg.ClientActive("xbooru")
+	if !active {
+		t.Fatalf("ClientActive(xbooru) = false (%s), want true without credentials", reason)
+	}
+}
+
 func TestClientActiveReasonHidesSecrets(t *testing.T) {
 	cfg := testConfig(t)
 	t.Setenv("RULE34_API_KEY", "super-secret-value")
