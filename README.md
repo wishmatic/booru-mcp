@@ -1,3 +1,5 @@
+<img src="docs/images/logo.webp" alt="Neo MCP Logo" width="128">
+
 # Booru MCP
 
 An MCP server, written in Go, that gives image generation models real booru tags and real booru images from platforms

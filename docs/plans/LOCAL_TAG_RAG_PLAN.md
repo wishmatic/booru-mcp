@@ -1,5 +1,3 @@
-<img src="docs/images/logo.webp" alt="Booru MCP Logo" width="128">
-
 # Local tag dataset and RAG hybrid search
 
 Status: Proposed. Nothing here is implemented.
