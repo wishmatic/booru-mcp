@@ -9,10 +9,8 @@ import (
 )
 
 type Deps struct {
-	Log                   *zap.Logger
-	Catalog               *catalog.Service
-	RelatedClients        []string
-	RelatedDefaultClients []string
+	Log     *zap.Logger
+	Catalog *catalog.Service
 }
 
 func New(deps Deps) (*mcp.Server, error) {
@@ -25,13 +23,7 @@ func New(deps Deps) (*mcp.Server, error) {
 		Version: "0.1.0",
 	}, nil)
 
-	h := &handlers{log: deps.Log, catalog: deps.Catalog}
-
-	registerPopular(srv, h)
-	registerTags(srv, h)
-	registerRelated(srv, h, deps.RelatedClients, deps.RelatedDefaultClients)
-	registerSearch(srv, h)
-	registerGet(srv, h)
+	registerTags(srv, &handlers{log: deps.Log, catalog: deps.Catalog})
 
 	return srv, nil
 }

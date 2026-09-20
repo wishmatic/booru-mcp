@@ -1,73 +1,48 @@
 package catalog
 
 import (
-	"time"
+	"context"
 
 	"github.com/wishmatic/booru-mcp/internal/booru"
-	"github.com/wishmatic/booru-mcp/internal/store"
 )
 
 const (
-	defaultSearchLimit  = 20
-	defaultTagLimit     = 25
-	popularFanOutFactor = 4
+	DefaultTagLimit = 25
+
+	defaultMaxLimit  = 100
+	defaultMaxOffset = 1000
 )
 
+// TagSource is the one capability the service needs from the booru client. It is declared here, where it is consumed,
+// so the search and its policy stay testable without an HTTP server.
+type TagSource interface {
+	SearchTags(ctx context.Context, query booru.TagQuery) (booru.TagPage, error)
+}
+
 type Options struct {
-	DefaultClients []string
-	CacheTTL       time.Duration
-	ContentRating  booru.Rating
-	BlockedTags    []string
-	MaxLimit       int
+	BlockedTags []string
+	MaxLimit    int
+	MaxOffset   int
 }
 
+// Service owns the policy around a tag search: what a valid search is, which window sizes are allowed, and which tag
+// names an operator has blocked.
 type Service struct {
-	registry *booru.Registry
-	store    *store.Client
-	opts     Options
-	now      func() time.Time
+	source  TagSource
+	opts    Options
+	blocked map[string]bool
 }
 
-func New(registry *booru.Registry, storeClient *store.Client, opts Options) *Service {
+func New(source TagSource, opts Options) *Service {
 	if opts.MaxLimit < 1 {
-		opts.MaxLimit = 100
+		opts.MaxLimit = defaultMaxLimit
 	}
 
-	return &Service{registry: registry, store: storeClient, opts: opts, now: time.Now}
-}
-
-func (s *Service) clampLimit(requested, fallback int) int {
-	if requested <= 0 {
-		requested = fallback
+	if opts.MaxOffset < 1 {
+		opts.MaxOffset = defaultMaxOffset
 	}
 
-	if requested > s.opts.MaxLimit {
-		requested = s.opts.MaxLimit
-	}
-
-	return requested
-}
-
-func (s *Service) fetchLimit(limit int) int {
-	fanned := limit * popularFanOutFactor
-	if fanned < limit {
-		fanned = limit
-	}
-
-	if fanned > s.opts.MaxLimit {
-		fanned = s.opts.MaxLimit
-	}
-
-	return fanned
-}
-
-func (s *Service) isStale(fetchedAt time.Time) bool {
-	ttl := s.opts.CacheTTL
-	if ttl <= 0 {
-		return true
-	}
-
-	return s.now().Sub(fetchedAt) >= ttl
+	return &Service{source: source, opts: opts, blocked: blockedSet(opts.BlockedTags)}
 }
 
 func blockedSet(names []string) map[string]bool {
@@ -78,4 +53,22 @@ func blockedSet(names []string) map[string]bool {
 	}
 
 	return set
+}
+
+func (s *Service) filterBlocked(tags []booru.Tag) []booru.Tag {
+	if len(s.blocked) == 0 {
+		return tags
+	}
+
+	kept := make([]booru.Tag, 0, len(tags))
+
+	for _, tag := range tags {
+		if s.blocked[tag.Name] {
+			continue
+		}
+
+		kept = append(kept, tag)
+	}
+
+	return kept
 }

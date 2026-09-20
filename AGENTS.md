@@ -48,7 +48,9 @@ lines of code, and even if it might influence readability, do so at unacceptably
 
 Arrows point from a package to the packages it imports. Only `internal/server` may import `internal/mcp`; the
 libraries below it must not import `internal/mcp` or the MCP SDK. `internal/utils` is the shared leaf and must stay
-dependency-free.
+dependency-free. There is one client and one tool: `internal/booru` holds the tag model and the Danbooru client,
+`internal/catalog` owns the search policy and declares the single-method source it needs, and `internal/mcp` registers
+`tags` and nothing else.
 
 If you make changes to the architecture, update this diagram.
 
@@ -66,15 +68,10 @@ flowchart TD
     subgraph domain[Domain libraries]
         catalog["internal/catalog"]
         booru["internal/booru"]
-        present["internal/present"]
     end
 
     subgraph clients[Backend and infrastructure clients]
-        danbooru["internal/danbooru"]
-        gelbooru["internal/gelbooru"]
-        moebooru["internal/moebooru"]
         fetch["internal/fetch"]
-        store["internal/store"]
     end
 
     subgraph platform[Platform]
@@ -88,32 +85,19 @@ flowchart TD
 
     server --> mcp
     server --> catalog
-    server --> danbooru
-    server --> gelbooru
-    server --> moebooru
+    server --> booru
     server --> fetch
-    server --> store
     server --> auth
     server --> config
 
     mcp --> catalog
     mcp --> booru
-    mcp --> present
 
     catalog --> booru
-    catalog --> store
 
-    present --> booru
-
-    danbooru --> booru
-    danbooru --> fetch
-    gelbooru --> booru
-    gelbooru --> fetch
-    moebooru --> booru
-    moebooru --> fetch
+    booru --> fetch
 
     fetch --> utils
-    store --> utils
     config --> booru
 ```
 

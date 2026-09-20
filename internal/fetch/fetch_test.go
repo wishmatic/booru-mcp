@@ -258,7 +258,7 @@ func TestNonJSONBodyIsATypedBodyError(t *testing.T) {
 	}{
 		"html":        {contentType: "text/html", body: "<html>Access Restricted</html>", wantReason: "HTML", wantBody: "Access Restricted"},
 		"xml":         {contentType: "text/xml", body: "<tags type=\"array\"></tags>", wantReason: "HTML or XML", wantBody: "<tags"},
-		"json string": {contentType: "application/json", body: `"Missing authentication. Go to api.rule34.xxx for more information"`, wantReason: "upstream message", wantBody: "Missing authentication"},
+		"json string": {contentType: "application/json", body: `"Missing authentication. Go to the API host for more information"`, wantReason: "upstream message", wantBody: "Missing authentication"},
 		"plain text":  {contentType: "text/plain", body: "404 page not found", wantReason: "non-JSON", wantBody: "404 page not found"},
 	}
 
@@ -270,7 +270,7 @@ func TestNonJSONBodyIsATypedBodyError(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, &countingLimiter{}), "rule34", "/index.php", nil)
+			_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, &countingLimiter{}), "upstream", "/index.php", nil)
 			if err == nil {
 				t.Fatal("GetJSON() error = nil, want a body error")
 			}
@@ -284,7 +284,7 @@ func TestNonJSONBodyIsATypedBodyError(t *testing.T) {
 				t.Errorf("StatusCode = %d, want 200", bodyErr.StatusCode)
 			}
 
-			for _, want := range []string{"rule34", "/index.php", "200", tt.wantReason, tt.wantBody} {
+			for _, want := range []string{"upstream", "/index.php", "200", tt.wantReason, tt.wantBody} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("error %q does not contain %q", err.Error(), want)
 				}
@@ -328,7 +328,7 @@ func TestWrongShapeDecodesAsBodyError(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, &countingLimiter{}), "gelbooru", "/index.php", nil)
+	_, err := GetJSON[map[string]any](context.Background(), newTestClient(t, server.URL, &countingLimiter{}), "upstream", "/index.php", nil)
 	if err == nil {
 		t.Fatal("GetJSON() error = nil, want a body error")
 	}

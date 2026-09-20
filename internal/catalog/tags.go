@@ -3,109 +3,62 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"strings"
+	"unicode"
 
 	"github.com/wishmatic/booru-mcp/internal/booru"
-	"github.com/wishmatic/booru-mcp/internal/store"
 )
 
+// wildcardMetacharacters are the pattern characters both tag APIs understand. They are replaced with a space rather
+// than deleted, so a search like `blue*hair` reads as `blue_hair` instead of `bluehair`.
+var wildcardMetacharacters = strings.NewReplacer("*", " ", "?", " ", "%", " ", `\`, " ")
+
 type TagsInput struct {
-	Query    string
-	Clients  []string
-	Category booru.TagCategory
-	Limit    int
-	Refresh  bool
+	Search string
+	Offset int
+	Limit  int
 }
 
 type TagsResult struct {
-	Tags     []booru.FusedTag
-	Skipped  []booru.Skipped
-	Warnings []string
-	Clients  []booru.ClientStatus
+	Search string
+	Tags   []booru.Tag
+	More   bool
 }
 
 func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error) {
-	resolution, err := s.resolve(input.Clients)
+	search, err := normalizeSearch(input.Search)
 	if err != nil {
 		return TagsResult{}, err
 	}
 
-	limit := s.clampLimit(input.Limit, defaultTagLimit)
-	query := booru.NormalizeTag(input.Query)
-
-	var (
-		sets      []tagSet
-		warnings  []string
-		statuses  = skippedStatuses(resolution.skipped)
-		lastErr   error
-		successes int
-	)
-
-	for _, entry := range resolution.active {
-		tags, err := s.clientTags(ctx, entry, query, input.Category, s.fetchLimit(limit), input.Refresh)
-		if err != nil {
-			lastErr = err
-			warnings = append(warnings, fmt.Sprintf("%s: %v", entry.Name, err))
-			statuses = append(statuses, errorStatus(entry.Name, err))
-
-			continue
-		}
-
-		successes++
-		sets = append(sets, tagSet{Client: entry.Name, Tags: tags})
-		statuses = append(statuses, okStatus(entry.Name, len(tags), ""))
+	if err := s.validateWindow(input.Offset, input.Limit); err != nil {
+		return TagsResult{}, err
 	}
 
-	result := TagsResult{Skipped: resolution.skipped, Warnings: warnings, Clients: statuses}
-
-	if len(resolution.active) > 0 && successes == 0 && lastErr != nil {
-		return result, fmt.Errorf("catalog: all clients failed: %w", lastErr)
-	}
-
-	result.Tags = capFused(s.filterTagNames(mergeTagSets(sets)), limit)
-
-	return result, nil
-}
-
-func (s *Service) clientTags(
-	ctx context.Context,
-	entry booru.Entry,
-	query string,
-	category booru.TagCategory,
-	limit int,
-	refresh bool,
-) ([]booru.Tag, error) {
-	if s.opts.CacheTTL <= 0 {
-		return entry.Provider.SearchTags(ctx, booru.TagQuery{Query: query, Category: category, Limit: limit})
-	}
-
-	cached, err := s.store.SearchTags(ctx, store.TagFilter{Client: entry.Name, Query: query, Category: category, Limit: limit})
+	page, err := s.source.SearchTags(ctx, booru.TagQuery{Search: search, Offset: input.Offset, Limit: input.Limit})
 	if err != nil {
-		return nil, err
+		return TagsResult{}, fmt.Errorf("catalog: %w", err)
 	}
 
-	if len(cached) > 0 && !refresh && !s.hasStalePopular(cached) {
-		return cachedTags(cached), nil
-	}
-
-	tags, fetchErr := entry.Provider.SearchTags(ctx, booru.TagQuery{Query: query, Category: category, Limit: limit})
-	if fetchErr != nil {
-		if len(cached) > 0 {
-			return cachedTags(cached), nil
-		}
-
-		return nil, fetchErr
-	}
-
-	if err := s.store.UpsertTags(ctx, entry.Name, tags, s.now()); err != nil {
-		return nil, err
-	}
-
-	return tags, nil
+	return TagsResult{Search: search, Tags: s.filterBlocked(page.Tags), More: page.More}, nil
 }
 
-func (s *Service) hasStalePopular(cached []store.CachedTag) bool {
-	for _, tag := range cached {
-		if tag.IsPopular && s.isStale(tag.FetchedAt) {
+// normalizeSearch renders a caller's search as a literal substring of a canonical tag name. The metacharacters both tag
+// APIs understand are replaced, so a search can never become an expression, and a search with no letter or digit left
+// is rejected rather than sent as a match-everything pattern.
+func normalizeSearch(value string) (string, error) {
+	search := strings.Trim(booru.NormalizeTag(wildcardMetacharacters.Replace(value)), "_")
+
+	if !hasLetterOrDigit(search) {
+		return "", fmt.Errorf("search %q has no letters or digits to match", value)
+	}
+
+	return search, nil
+}
+
+func hasLetterOrDigit(value string) bool {
+	for _, r := range value {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			return true
 		}
 	}
@@ -113,20 +66,14 @@ func (s *Service) hasStalePopular(cached []store.CachedTag) bool {
 	return false
 }
 
-func cachedTags(cached []store.CachedTag) []booru.Tag {
-	tags := make([]booru.Tag, 0, len(cached))
-
-	for _, tag := range cached {
-		tags = append(tags, tag.Tag)
+func (s *Service) validateWindow(offset, limit int) error {
+	if offset < 0 || offset > s.opts.MaxOffset {
+		return fmt.Errorf("offset must be between 0 and %d, got %d", s.opts.MaxOffset, offset)
 	}
 
-	return tags
-}
-
-func capFused(tags []booru.FusedTag, limit int) []booru.FusedTag {
-	if limit > 0 && len(tags) > limit {
-		return tags[:limit]
+	if limit < 1 || limit > s.opts.MaxLimit {
+		return fmt.Errorf("limit must be between 1 and %d, got %d", s.opts.MaxLimit, limit)
 	}
 
-	return tags
+	return nil
 }
