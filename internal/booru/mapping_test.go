@@ -36,8 +36,10 @@ func TestSearchTagsMapsAndDropsEmptyNames(t *testing.T) {
 	}
 
 	for i, tag := range want {
-		if page.Tags[i] != tag {
-			t.Errorf("tags[%d] = %+v, want %+v", i, page.Tags[i], tag)
+		got := page.Tags[i]
+
+		if got.Name != tag.Name || got.Category != tag.Category || got.Count != tag.Count {
+			t.Errorf("tags[%d] = %+v, want %+v", i, got, tag)
 		}
 	}
 }

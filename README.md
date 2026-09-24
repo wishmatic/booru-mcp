@@ -5,27 +5,41 @@ searches tag names on Danbooru and returns the matches with their category and w
 
 ## The `tags` tool
 
-| Argument | Required | Default | Notes                                                                                   |
-| -------- | -------- | ------- | --------------------------------------------------------------------------------------- |
-| `search` | yes      |         | a literal substring of the tag name, so `blue hair` and `blue_hair` are the same search |
-| `offset` | no       | `0`     | how many matching tags to skip                                                          |
-| `limit`  | no       | `25`    | how many matching tags to return                                                        |
+| Argument   | Required | Default | Notes                                                                                   |
+| ---------- | -------- | ------- | --------------------------------------------------------------------------------------- |
+| `search`   | yes      |         | a literal substring of the tag name, so `blue hair` and `blue_hair` are the same search |
+| `offset`   | no       | `0`     | how many matching tags to skip                                                          |
+| `limit`    | no       | `25`    | how many matching tags to return                                                        |
+| `exact`    | no       | `false` | when true, `search` is the whole tag name and the result is that one tag or nothing     |
+| `category` | no       | all     | keep only these categories: `general`, `artist`, `copyright`, `character`, `meta`       |
 
-Results come back ordered by work count as one page of the match list:
+Results come back ordered by work count (name ascending on ties) as one page of the match list:
 
 ```json
 {
     "search": "blue_hair",
+    "exact": false,
+    "status": "ok",
+    "snapshot_date": "2026-09-24",
     "offset": 0,
     "limit": 25,
     "more": true,
-    "tags": [{ "name": "blue_hair", "category": "general", "count": 482913 }]
+    "alias_of": "",
+    "tags": [{ "name": "blue_hair", "category": "general", "count": 1207766, "alias_of": "", "implications": [] }]
 }
 ```
 
-Walk the list with `offset` and stop when `more` is false. An empty `tags` array with `more` false means no tags match,
-which is a definitive answer rather than a failure. Every call is live; nothing is cached or stored, and an upstream
-failure is reported as an error rather than as an empty page.
+Walk the list with `offset` and stop when `more` is false. Substring results omit tags with zero works, because
+Danbooru's user-editable tag table also holds concatenated and punctuation-mangled names; those are not reliable tags.
+An empty `tags` array is accompanied by a `status` that says whether the search genuinely matched nothing
+(`no_substring_match`) or whether an unanswerable case was reached (`unknown`).
+
+Use `exact: true` to ask whether one tag exists. It is the only reliable existence check: a substring miss proves
+nothing. Aliases resolve to their target, reported as `alias_of` and the target's count, and each result carries the
+`implications` Danbooru knows for it. Counts are read live, so `snapshot_date` records the date they were read.
+
+Every call is live; nothing is cached, except the implication graph, which is crawled in the background and refreshed
+on `IMPLICATION_INDEX_REFRESH_HOURS`. An upstream failure is reported as an error rather than as an empty page.
 
 ## Usage
 

@@ -48,9 +48,9 @@ lines of code, and even if it might influence readability, do so at unacceptably
 
 Arrows point from a package to the packages it imports. Only `internal/server` may import `internal/mcp`; the
 libraries below it must not import `internal/mcp` or the MCP SDK. `internal/utils` is the shared leaf and must stay
-dependency-free. There is one client and one tool: `internal/booru` holds the tag model and the Danbooru client,
-`internal/catalog` owns the search policy and declares the single-method source it needs, and `internal/mcp` registers
-`tags` and nothing else.
+dependency-free. There is one client and one tool: `internal/booru` holds the tag model, the Danbooru client, and the
+cached implication index built from Danbooru's canonical tag tables; `internal/catalog` owns the search policy and
+declares the source it needs; and `internal/mcp` registers `tags` and nothing else.
 
 If you make changes to the architecture, update this diagram.
 

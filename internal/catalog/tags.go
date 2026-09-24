@@ -9,20 +9,34 @@ import (
 	"github.com/wishmatic/booru-mcp/internal/booru"
 )
 
-// wildcardMetacharacters are the pattern characters both tag APIs understand. They are replaced with a space rather
-// than deleted, so a search like `blue*hair` reads as `blue_hair` instead of `bluehair`.
+// wildcardMetacharacters are the pattern characters the Danbooru tag API understands. They are replaced with a space
+// rather than deleted, so a search like `blue*hair` reads as `blue_hair` instead of `bluehair`.
 var wildcardMetacharacters = strings.NewReplacer("*", " ", "?", " ", "%", " ", `\`, " ")
 
+type Status string
+
+const (
+	StatusOK               Status = "ok"
+	StatusNoSubstringMatch Status = "no_substring_match"
+	StatusExactNotFound    Status = "exact_not_found"
+	StatusUnknown          Status = "unknown"
+)
+
 type TagsInput struct {
-	Search string
-	Offset int
-	Limit  int
+	Search     string
+	Offset     int
+	Limit      int
+	Exact      bool
+	Categories []booru.TagCategory
 }
 
 type TagsResult struct {
-	Search string
-	Tags   []booru.Tag
-	More   bool
+	Search       string
+	Tags         []booru.Tag
+	More         bool
+	Status       Status
+	AliasOf      string
+	SnapshotDate string
 }
 
 func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error) {
@@ -31,16 +45,83 @@ func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error)
 		return TagsResult{}, err
 	}
 
+	if err := validateCategories(input.Categories); err != nil {
+		return TagsResult{}, err
+	}
+
+	if input.Exact {
+		return s.exact(ctx, search, input.Categories)
+	}
+
 	if err := s.validateWindow(input.Offset, input.Limit); err != nil {
 		return TagsResult{}, err
 	}
 
-	page, err := s.source.SearchTags(ctx, booru.TagQuery{Search: search, Offset: input.Offset, Limit: input.Limit})
+	query := booru.TagQuery{
+		Search:     search,
+		Categories: input.Categories,
+		Offset:     input.Offset,
+		Limit:      input.Limit,
+	}
+
+	window, err := s.source.SearchTags(ctx, query)
 	if err != nil {
 		return TagsResult{}, fmt.Errorf("catalog: %w", err)
 	}
 
-	return TagsResult{Search: search, Tags: s.filterBlocked(page.Tags), More: page.More}, nil
+	tags := s.enrich(s.filterBlocked(window.Tags))
+
+	status := StatusOK
+	if len(tags) == 0 {
+		status = StatusNoSubstringMatch
+	}
+
+	return s.result(search, tags, window.More, status, ""), nil
+}
+
+func (s *Service) result(search string, tags []booru.Tag, more bool, status Status, aliasOf string) TagsResult {
+	return TagsResult{
+		Search:       search,
+		Tags:         tags,
+		More:         more,
+		Status:       status,
+		AliasOf:      aliasOf,
+		SnapshotDate: s.snapshotDate(),
+	}
+}
+
+func (s *Service) enrich(tags []booru.Tag) []booru.Tag {
+	out := make([]booru.Tag, 0, len(tags))
+
+	for _, tag := range tags {
+		tag.Implications = knownImplications(s.opts.Relations, tag.Name)
+		out = append(out, tag)
+	}
+
+	return out
+}
+
+func knownImplications(index RelationIndex, name string) []string {
+	if index == nil {
+		return []string{}
+	}
+
+	known := index.Implications(name)
+	if len(known) == 0 {
+		return []string{}
+	}
+
+	return known
+}
+
+func validateCategories(categories []booru.TagCategory) error {
+	for _, category := range categories {
+		if _, ok := booru.ParseTagCategory(category.String()); !ok {
+			return fmt.Errorf("category %q is not one of %s", category, booru.CategoryList())
+		}
+	}
+
+	return nil
 }
 
 // normalizeSearch renders a caller's search as a literal substring of a canonical tag name. The metacharacters both tag

@@ -14,6 +14,15 @@ type fakeSource struct {
 	err   error
 	calls int
 	query booru.TagQuery
+
+	tag          booru.Tag
+	found        bool
+	findErr      error
+	aliasTarget  string
+	aliased      bool
+	aliasErr     error
+	implications []string
+	implErr      error
 }
 
 func (f *fakeSource) SearchTags(_ context.Context, query booru.TagQuery) (booru.TagPage, error) {
@@ -21,6 +30,27 @@ func (f *fakeSource) SearchTags(_ context.Context, query booru.TagQuery) (booru.
 	f.query = query
 
 	return f.page, f.err
+}
+
+func (f *fakeSource) FindTag(_ context.Context, name string) (booru.Tag, bool, error) {
+	f.calls++
+	f.query = booru.TagQuery{Search: name}
+
+	return f.tag, f.found, f.findErr
+}
+
+func (f *fakeSource) AliasTarget(_ context.Context, name string) (string, bool, error) {
+	f.calls++
+	f.query = booru.TagQuery{Search: name}
+
+	return f.aliasTarget, f.aliased, f.aliasErr
+}
+
+func (f *fakeSource) Implications(_ context.Context, name string) ([]string, error) {
+	f.calls++
+	f.query = booru.TagQuery{Search: name}
+
+	return f.implications, f.implErr
 }
 
 func testOptions() Options {

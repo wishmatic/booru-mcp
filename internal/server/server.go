@@ -24,10 +24,13 @@ import (
 const writeTimeout = 10 * time.Minute
 
 type Server struct {
-	cfg    config.Config
-	log    *zap.Logger
-	router *chi.Mux
-	http   *http.Server
+	cfg       config.Config
+	log       *zap.Logger
+	router    *chi.Mux
+	http      *http.Server
+	relations *booru.ImplicationIndex
+	indexCtx  context.Context
+	stopIndex context.CancelFunc
 }
 
 func New(cfg config.Config, log *zap.Logger) (*Server, error) {
@@ -44,14 +47,20 @@ func New(cfg config.Config, log *zap.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	return newWithProvider(cfg, log, provider)
+	return newWithProvider(cfg, log, provider, booru.NewImplicationIndex(provider, cfg.ImplicationIndexInterval()))
 }
 
-func newWithProvider(cfg config.Config, log *zap.Logger, provider *booru.Client) (*Server, error) {
+func newWithProvider(
+	cfg config.Config,
+	log *zap.Logger,
+	provider *booru.Client,
+	relations *booru.ImplicationIndex,
+) (*Server, error) {
 	service := catalog.New(provider, catalog.Options{
 		BlockedTags: cfg.BlockedTags(),
 		MaxLimit:    cfg.MaxLimit,
 		MaxOffset:   cfg.MaxOffset,
+		Relations:   relations,
 	})
 
 	mcpSrv, err := mcpServer.New(mcpServer.Deps{Log: log, Catalog: service})
@@ -84,10 +93,15 @@ func newWithProvider(cfg config.Config, log *zap.Logger, provider *booru.Client)
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	indexCtx, stopIndex := context.WithCancel(context.Background())
+
 	return &Server{
-		cfg:    cfg,
-		log:    log,
-		router: router,
+		cfg:       cfg,
+		log:       log,
+		router:    router,
+		relations: relations,
+		indexCtx:  indexCtx,
+		stopIndex: stopIndex,
 		http: &http.Server{
 			Addr:              cfg.Addr(),
 			Handler:           router,
@@ -129,6 +143,8 @@ func buildProvider(cfg config.Config, log *zap.Logger) (*booru.Client, error) {
 }
 
 func (s *Server) Run() error {
+	s.startImplicationIndex()
+
 	s.log.Info("server listening", zap.String("addr", s.cfg.Addr()))
 
 	if err := s.http.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -138,6 +154,22 @@ func (s *Server) Run() error {
 	return nil
 }
 
+// startImplicationIndex crawls the canonical implication graph in the background. It is started here rather than in New
+// so that constructing a server never makes a network call, which keeps tests and offline use quiet.
+func (s *Server) startImplicationIndex() {
+	if s.relations == nil {
+		return
+	}
+
+	s.relations.Start(s.indexCtx, func(err error) {
+		s.log.Warn("implication index refresh failed", zap.Error(err))
+	})
+}
+
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.stopIndex != nil {
+		s.stopIndex()
+	}
+
 	return s.http.Shutdown(ctx)
 }

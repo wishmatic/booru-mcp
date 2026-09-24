@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"time"
 
 	"github.com/wishmatic/booru-mcp/internal/booru"
 )
@@ -13,24 +14,37 @@ const (
 	defaultMaxOffset = 1000
 )
 
-// TagSource is the one capability the service needs from the booru client. It is declared here, where it is consumed,
-// so the search and its policy stay testable without an HTTP server.
+// TagSource is the capabilities the service needs from the booru client: the paged substring search plus the three
+// canonical lookups that back exact mode. It is declared here, where it is consumed, so the policy stays testable
+// without an HTTP server.
 type TagSource interface {
 	SearchTags(ctx context.Context, query booru.TagQuery) (booru.TagPage, error)
+	FindTag(ctx context.Context, name string) (booru.Tag, bool, error)
+	AliasTarget(ctx context.Context, name string) (string, bool, error)
+	Implications(ctx context.Context, name string) ([]string, error)
+}
+
+// RelationIndex answers implications from the ingested graph without touching the network. A nil index is valid and
+// simply means no implications are known locally.
+type RelationIndex interface {
+	Implications(name string) []string
 }
 
 type Options struct {
 	BlockedTags []string
 	MaxLimit    int
 	MaxOffset   int
+	Relations   RelationIndex
+	Clock       func() time.Time
 }
 
-// Service owns the policy around a tag search: what a valid search is, which window sizes are allowed, and which tag
-// names an operator has blocked.
+// Service owns the policy around a tag search: what a valid search is, which window sizes are allowed, which tag
+// names an operator has blocked, and how an alias, an implication, and an empty result are reported.
 type Service struct {
 	source  TagSource
 	opts    Options
 	blocked map[string]bool
+	now     func() time.Time
 }
 
 func New(source TagSource, opts Options) *Service {
@@ -42,7 +56,11 @@ func New(source TagSource, opts Options) *Service {
 		opts.MaxOffset = defaultMaxOffset
 	}
 
-	return &Service{source: source, opts: opts, blocked: blockedSet(opts.BlockedTags)}
+	if opts.Clock == nil {
+		opts.Clock = time.Now
+	}
+
+	return &Service{source: source, opts: opts, blocked: blockedSet(opts.BlockedTags), now: opts.Clock}
 }
 
 func blockedSet(names []string) map[string]bool {
@@ -71,4 +89,8 @@ func (s *Service) filterBlocked(tags []booru.Tag) []booru.Tag {
 	}
 
 	return kept
+}
+
+func (s *Service) snapshotDate() string {
+	return s.now().UTC().Format("2006-01-02")
 }

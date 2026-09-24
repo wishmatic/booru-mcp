@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,10 @@ const (
 	// tagPageCeiling is the largest page requested from the tag listing. Keeping it modest bounds how many pages one
 	// window spans and keeps the page index small, which matters because Danbooru caps how deep page may go.
 	tagPageCeiling = 100
+
+	tagFields = "name,category,post_count"
+
+	implicationPageCeiling = 1000
 )
 
 type Config struct {
@@ -64,6 +69,10 @@ func (c *Client) Name() string {
 // SearchTags returns exactly the window [query.Offset, query.Offset+query.Limit) of the count-ordered tag matches, or
 // a shorter final window, plus whether at least one match exists past it. The listing is page-based, so the window is
 // read from the one or two pages that contain it.
+//
+// Rows with no posts are dropped rather than returned. Danbooru's tag table is user-editable and carries concatenated
+// and punctuation-mangled rows that no caller wants; because the listing is count-ordered they are always the tail, so
+// paging stops as soon as one is seen.
 func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error) {
 	if strings.TrimSpace(query.Search) == "" {
 		return TagPage{}, fmt.Errorf("%s: tag search needs a search term", c.name)
@@ -81,37 +90,51 @@ func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error
 	collected := make([]Tag, 0, wanted)
 
 	for page := query.Offset/pageSize + 1; len(collected) < wanted; page++ {
-		batch, err := c.tagPage(ctx, query.Search, page, pageSize)
+		batch, err := c.searchPage(ctx, query, page, pageSize)
 		if err != nil {
 			return TagPage{}, err
 		}
 
-		collected = append(collected, batch...)
+		exhausted := len(batch) < pageSize
 
-		if len(batch) < pageSize {
+		for _, tag := range batch {
+			if tag.Count <= 0 {
+				exhausted = true
+
+				break
+			}
+
+			collected = append(collected, tag)
+		}
+
+		if exhausted {
 			break
 		}
 	}
 
-	page := TagPage{}
+	sortTags(collected)
+
+	window := TagPage{}
 
 	if skip < len(collected) {
-		page.Tags = collected[skip:]
+		window.Tags = collected[skip:]
 	}
 
-	if len(page.Tags) > query.Limit {
-		page.More = true
-		page.Tags = page.Tags[:query.Limit]
+	if len(window.Tags) > query.Limit {
+		window.More = true
+		window.Tags = window.Tags[:query.Limit]
 	}
 
-	return page, nil
+	return window, nil
 }
 
-func (c *Client) tagPage(ctx context.Context, search string, page, limit int) ([]Tag, error) {
+func (c *Client) searchPage(ctx context.Context, query TagQuery, page, limit int) ([]Tag, error) {
 	params := url.Values{}
 	params.Set("search[order]", "count")
-	params.Set("search[name_matches]", "*"+search+"*")
+	params.Set("search[name_matches]", "*"+query.Search+"*")
 	params.Set("limit", strconv.Itoa(limit))
+	params.Set("only", tagFields)
+	c.setCategories(params, query.Categories)
 
 	if page > 1 {
 		params.Set("page", strconv.Itoa(page))
@@ -125,6 +148,20 @@ func (c *Client) tagPage(ctx context.Context, search string, page, limit int) ([
 	}
 
 	return toTags(raw), nil
+}
+
+func (c *Client) setCategories(params url.Values, categories []TagCategory) {
+	if len(categories) == 0 {
+		return
+	}
+
+	codes := make([]string, 0, len(categories))
+
+	for _, category := range categories {
+		codes = append(codes, strconv.Itoa(category.Code()))
+	}
+
+	params.Set("search[category]", strings.Join(codes, ","))
 }
 
 func (c *Client) pageSize() int {
@@ -144,23 +181,12 @@ func (c *Client) auth(params url.Values) {
 	params.Set("api_key", c.apiKey)
 }
 
-func toTags(raw []tagJSON) []Tag {
-	tags := make([]Tag, 0, len(raw))
-
-	for _, item := range raw {
-		name := NormalizeTag(item.Name)
-		if name == "" {
-			continue
+func sortTags(tags []Tag) {
+	sort.SliceStable(tags, func(i, j int) bool {
+		if tags[i].Count != tags[j].Count {
+			return tags[i].Count > tags[j].Count
 		}
 
-		tags = append(tags, Tag{Name: name, Category: tagCategory(item.Category), Count: item.PostCount})
-	}
-
-	return tags
-}
-
-type tagJSON struct {
-	Name      string `json:"name"`
-	Category  int    `json:"category"`
-	PostCount int    `json:"post_count"`
+		return tags[i].Name < tags[j].Name
+	})
 }

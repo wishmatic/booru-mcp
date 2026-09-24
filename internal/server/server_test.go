@@ -58,7 +58,7 @@ func newTestServer(t *testing.T, cfg config.Config, upstreamURL string) *Server 
 
 	provider := booru.New(booru.Config{BaseURL: upstreamURL, MaxLimit: cfg.MaxLimit, HTTP: transport})
 
-	srv, err := newWithProvider(cfg, zap.NewNop(), provider)
+	srv, err := newWithProvider(cfg, zap.NewNop(), provider, nil)
 	if err != nil {
 		t.Fatalf("newWithProvider() error: %v", err)
 	}
@@ -113,6 +113,49 @@ func TestHealthzAndAuth(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Errorf("mcp without auth = %d, want 401", rec.Code)
+	}
+}
+
+func TestRunDoesNotCrawlWhenTheIndexIsDisabled(t *testing.T) {
+	var calls atomic.Int64
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	t.Cleanup(upstream.Close)
+
+	cfg := testConfig()
+	cfg.ImplicationIndexRefreshHours = 0
+
+	transport, err := fetch.New(fetch.Config{BaseURL: upstream.URL, Limiter: noopLimiter{}})
+	if err != nil {
+		t.Fatalf("fetch.New() error: %v", err)
+	}
+
+	provider := booru.New(booru.Config{BaseURL: upstream.URL, MaxLimit: cfg.MaxLimit, HTTP: transport})
+	index := booru.NewImplicationIndex(provider, cfg.ImplicationIndexInterval())
+
+	srv, err := newWithProvider(cfg, zap.NewNop(), provider, index)
+	if err != nil {
+		t.Fatalf("newWithProvider() error: %v", err)
+	}
+
+	srv.startImplicationIndex()
+
+	if got := calls.Load(); got != 0 {
+		t.Errorf("upstream calls = %d, want none while the index is disabled", got)
+	}
+}
+
+func TestStartImplicationIndexWithoutAnIndexIsSafe(t *testing.T) {
+	srv := newTestServer(t, testConfig(), "http://127.0.0.1:1")
+
+	srv.relations = nil
+	srv.startImplicationIndex()
+
+	if err := srv.Shutdown(context.Background()); err != nil {
+		t.Fatalf("Shutdown() error: %v", err)
 	}
 }
 

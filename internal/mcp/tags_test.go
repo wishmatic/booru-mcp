@@ -17,6 +17,15 @@ type stubSource struct {
 	err   error
 	calls int
 	query booru.TagQuery
+
+	tag          booru.Tag
+	found        bool
+	findErr      error
+	aliasTarget  string
+	aliased      bool
+	aliasErr     error
+	implications []string
+	implErr      error
 }
 
 func (s *stubSource) SearchTags(_ context.Context, query booru.TagQuery) (booru.TagPage, error) {
@@ -24,6 +33,27 @@ func (s *stubSource) SearchTags(_ context.Context, query booru.TagQuery) (booru.
 	s.query = query
 
 	return s.page, s.err
+}
+
+func (s *stubSource) FindTag(_ context.Context, name string) (booru.Tag, bool, error) {
+	s.calls++
+	s.query = booru.TagQuery{Search: name}
+
+	return s.tag, s.found, s.findErr
+}
+
+func (s *stubSource) AliasTarget(_ context.Context, name string) (string, bool, error) {
+	s.calls++
+	s.query = booru.TagQuery{Search: name}
+
+	return s.aliasTarget, s.aliased, s.aliasErr
+}
+
+func (s *stubSource) Implications(_ context.Context, name string) ([]string, error) {
+	s.calls++
+	s.query = booru.TagQuery{Search: name}
+
+	return s.implications, s.implErr
 }
 
 func newTestServer(t *testing.T, source catalog.TagSource, opts catalog.Options) *mcp.Server {
@@ -136,11 +166,11 @@ func TestTagsSchemaShape(t *testing.T) {
 		t.Fatalf("properties = %#v", schema["properties"])
 	}
 
-	if len(props) != 3 {
-		t.Fatalf("properties = %v, want exactly search, offset, and limit", props)
+	if len(props) != 5 {
+		t.Fatalf("properties = %v, want search, offset, limit, exact, and category", props)
 	}
 
-	for _, name := range []string{"search", "offset", "limit"} {
+	for _, name := range []string{"search", "offset", "limit", "exact", "category"} {
 		if _, ok := props[name].(map[string]any); !ok {
 			t.Errorf("property %q = %#v, want an object", name, props[name])
 		}
@@ -156,6 +186,22 @@ func TestTagsSchemaShape(t *testing.T) {
 		if got, ok := property["default"].(float64); !ok || got != want {
 			t.Errorf("default for %q = %#v, want %v", name, property["default"], want)
 		}
+	}
+
+	exact, _ := props["exact"].(map[string]any)
+	if got, ok := exact["default"].(bool); !ok || got {
+		t.Errorf("default for exact = %#v, want false", exact["default"])
+	}
+
+	category, _ := props["category"].(map[string]any)
+	items, ok := category["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("category items = %#v, want an items schema", category["items"])
+	}
+
+	enum, ok := items["enum"].([]any)
+	if !ok || len(enum) != len(booru.CategoryNames()) {
+		t.Errorf("category enum = %#v, want every category name", items["enum"])
 	}
 }
 
@@ -175,8 +221,16 @@ func TestTagsReturnsTheWindow(t *testing.T) {
 		t.Errorf("output = %+v, want the echoed request and more", out)
 	}
 
-	if len(out.Tags) != 1 || out.Tags[0] != (tagOutput{Name: "blue_hair", Category: "general", Count: 482913}) {
+	if len(out.Tags) != 1 || out.Tags[0].Name != "blue_hair" || out.Tags[0].Category != "general" || out.Tags[0].Count != 482913 {
 		t.Errorf("tags = %+v", out.Tags)
+	}
+
+	if out.Tags[0].Implications == nil {
+		t.Error("implications = nil, want an empty slice")
+	}
+
+	if out.Status != string(catalog.StatusOK) || out.SnapshotDate == "" {
+		t.Errorf("output = %+v, want an ok status and a snapshot date", out)
 	}
 
 	if result == nil || len(result.Content) != 1 {

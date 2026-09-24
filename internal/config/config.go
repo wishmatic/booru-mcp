@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
@@ -36,6 +37,10 @@ type Config struct {
 	DanbooruAPIKey string `env:"DANBOORU_API_KEY"`
 
 	BlockedTagsRaw string `env:"BLOCKED_TAGS"`
+
+	// ImplicationIndexRefreshHours is how often the canonical implication graph is re-crawled. Zero disables the
+	// index, leaving every implication lookup a miss; exact mode still answers from a single upstream call.
+	ImplicationIndexRefreshHours int `env:"IMPLICATION_INDEX_REFRESH_HOURS" envDefault:"24"`
 }
 
 func Load() (Config, error) {
@@ -95,7 +100,15 @@ func (c Config) Validate() error {
 		return fmt.Errorf("MAX_OFFSET must be at least 1, got %d", c.MaxOffset)
 	}
 
+	if c.ImplicationIndexRefreshHours < 0 {
+		return fmt.Errorf("IMPLICATION_INDEX_REFRESH_HOURS must be zero or greater, got %d", c.ImplicationIndexRefreshHours)
+	}
+
 	return nil
+}
+
+func (c Config) ImplicationIndexInterval() time.Duration {
+	return time.Duration(c.ImplicationIndexRefreshHours) * time.Hour
 }
 
 func splitList(value string) []string {

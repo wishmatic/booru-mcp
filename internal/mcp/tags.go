@@ -17,32 +17,51 @@ type handlers struct {
 }
 
 type tagsInput struct {
-	Search string `json:"search" jsonschema:"a literal substring to match against Danbooru tag names; spaces and underscores are equivalent"`
-	Offset *int   `json:"offset,omitempty" jsonschema:"optional: how many matching tags to skip; defaults to 0"`
-	Limit  *int   `json:"limit,omitempty" jsonschema:"optional: how many matching tags to return; defaults to 25"`
+	Search     string   `json:"search" jsonschema:"tag name text to match; spaces and underscores are equivalent. A literal substring by default; the whole tag name when exact is true"`
+	Offset     *int     `json:"offset,omitempty" jsonschema:"optional: how many matching tags to skip; defaults to 0"`
+	Limit      *int     `json:"limit,omitempty" jsonschema:"optional: how many matching tags to return; defaults to 25"`
+	Exact      *bool    `json:"exact,omitempty" jsonschema:"optional: when true, search is the whole tag name and the result is that one tag or nothing; aliases resolve to their target. Defaults to false"`
+	Categories []string `json:"category,omitempty" jsonschema:"optional: keep only these categories; any of general, artist, copyright, character, meta"`
 }
 
 type tagsOutput struct {
-	Search string      `json:"search"`
-	Offset int         `json:"offset"`
-	Limit  int         `json:"limit"`
-	More   bool        `json:"more"`
-	Tags   []tagOutput `json:"tags"`
+	Search       string      `json:"search"`
+	Exact        bool        `json:"exact"`
+	Status       string      `json:"status"`
+	SnapshotDate string      `json:"snapshot_date"`
+	Offset       int         `json:"offset"`
+	Limit        int         `json:"limit"`
+	More         bool        `json:"more"`
+	AliasOf      string      `json:"alias_of"`
+	Tags         []tagOutput `json:"tags"`
 }
 
 type tagOutput struct {
-	Name     string `json:"name"`
-	Category string `json:"category"`
-	Count    int    `json:"count"`
+	Name         string   `json:"name"`
+	Category     string   `json:"category"`
+	Count        int      `json:"count"`
+	AliasOf      string   `json:"alias_of"`
+	Implications []string `json:"implications"`
 }
 
 func registerTags(srv *mcp.Server, h *handlers) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "tags",
-		Description: "Search Danbooru tag names and return the matching tags ordered by work count. `search` is matched " +
-			"as a literal substring of the tag name, so `blue hair` and `blue_hair` are the same search. The response " +
-			"is one page of the match list: use `offset` and `limit` to walk it and `more` to tell whether another page " +
-			"exists. An empty `tags` array with `more` false means no tags match.",
+		Description: "Search Danbooru tag names and return the matching tags ordered by work count.\n" +
+			"- By default `search` is a literal substring of the tag name, so `blue hair` and `blue_hair` are the same " +
+			"search. Substring results omit tags with zero works; Danbooru's user-editable tag table also holds " +
+			"concatenated and punctuation-mangled names, and those are not reliable tags.\n" +
+			"- Set `exact` to true to ask whether one exact tag exists. This is the only reliable existence check: a " +
+			"substring miss proves nothing about whether a real tag exists. Exact mode resolves aliases and reports the " +
+			"target's count.\n" +
+			"- Each result carries `implications` (canonical tags it implies, empty when none are known) and `alias_of` " +
+			"(set when the name is an alias).\n" +
+			"- Counts are read live; `snapshot_date` is the date they were read. Comparisons of counts across calls can " +
+			"differ because the underlying data changes.\n" +
+			"- The response is one page: use `offset` and `limit` to walk it and `more` to tell whether another page " +
+			"exists.\n" +
+			"- `status` distinguishes a real empty page (`no_substring_match`, `exact_not_found`) from an unconfirmed " +
+			"one (`unknown`).",
 		InputSchema: tagsSchema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    true,
@@ -68,14 +87,28 @@ func (h *handlers) tags(
 		limit = *in.Limit
 	}
 
+	exact := in.Exact != nil && *in.Exact
+
+	categories, err := parseCategories(in.Categories)
+	if err != nil {
+		return nil, tagsOutput{}, fmt.Errorf("tags: %w", err)
+	}
+
 	h.log.Debug("tool called",
 		zap.String("tool", "tags"),
 		zap.String("search", in.Search),
 		zap.Int("offset", offset),
 		zap.Int("limit", limit),
+		zap.Bool("exact", exact),
 	)
 
-	result, err := h.catalog.Tags(ctx, catalog.TagsInput{Search: in.Search, Offset: offset, Limit: limit})
+	result, err := h.catalog.Tags(ctx, catalog.TagsInput{
+		Search:     in.Search,
+		Offset:     offset,
+		Limit:      limit,
+		Exact:      exact,
+		Categories: categories,
+	})
 	if err != nil {
 		h.log.Error("tags failed", zap.Error(err))
 
@@ -83,14 +116,33 @@ func (h *handlers) tags(
 	}
 
 	out := tagsOutput{
-		Search: result.Search,
-		Offset: offset,
-		Limit:  limit,
-		More:   result.More,
-		Tags:   toTagOutputs(result.Tags),
+		Search:       result.Search,
+		Exact:        exact,
+		Status:       string(result.Status),
+		SnapshotDate: result.SnapshotDate,
+		Offset:       offset,
+		Limit:        limit,
+		More:         result.More,
+		AliasOf:      result.AliasOf,
+		Tags:         toTagOutputs(result.Tags),
 	}
 
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: renderTags(out)}}}, out, nil
+}
+
+func parseCategories(names []string) ([]booru.TagCategory, error) {
+	categories := make([]booru.TagCategory, 0, len(names))
+
+	for _, name := range names {
+		category, ok := booru.ParseTagCategory(name)
+		if !ok {
+			return nil, fmt.Errorf("category %q is not one of %s", name, booru.CategoryList())
+		}
+
+		categories = append(categories, category)
+	}
+
+	return categories, nil
 }
 
 func tagsSchema() *jsonschema.Schema {
@@ -98,15 +150,43 @@ func tagsSchema() *jsonschema.Schema {
 	schema.Required = []string{"search"}
 	setDefault(schema, "offset", 0)
 	setDefault(schema, "limit", catalog.DefaultTagLimit)
+	setDefault(schema, "exact", false)
+	setCategoryEnum(schema)
 
 	return schema
+}
+
+func setCategoryEnum(schema *jsonschema.Schema) {
+	property, ok := schema.Properties["category"]
+	if !ok || property.Items == nil {
+		return
+	}
+
+	allowed := make([]any, 0, len(booru.CategoryNames()))
+
+	for _, name := range booru.CategoryNames() {
+		allowed = append(allowed, name.String())
+	}
+
+	property.Items.Enum = allowed
 }
 
 func toTagOutputs(tags []booru.Tag) []tagOutput {
 	out := make([]tagOutput, 0, len(tags))
 
 	for _, tag := range tags {
-		out = append(out, tagOutput{Name: tag.Name, Category: tag.Category.String(), Count: tag.Count})
+		implications := tag.Implications
+		if implications == nil {
+			implications = []string{}
+		}
+
+		out = append(out, tagOutput{
+			Name:         tag.Name,
+			Category:     tag.Category.String(),
+			Count:        tag.Count,
+			AliasOf:      tag.AliasOf,
+			Implications: implications,
+		})
 	}
 
 	return out
