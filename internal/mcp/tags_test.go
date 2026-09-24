@@ -166,11 +166,11 @@ func TestTagsSchemaShape(t *testing.T) {
 		t.Fatalf("properties = %#v", schema["properties"])
 	}
 
-	if len(props) != 5 {
-		t.Fatalf("properties = %v, want search, offset, limit, exact, and category", props)
+	if len(props) != 6 {
+		t.Fatalf("properties = %v, want search, offset, limit, min_count, exact, and category", props)
 	}
 
-	for _, name := range []string{"search", "offset", "limit", "exact", "category"} {
+	for _, name := range []string{"search", "offset", "limit", "min_count", "exact", "category"} {
 		if _, ok := props[name].(map[string]any); !ok {
 			t.Errorf("property %q = %#v, want an object", name, props[name])
 		}
@@ -181,7 +181,7 @@ func TestTagsSchemaShape(t *testing.T) {
 		t.Errorf("required = %#v, want only search", schema["required"])
 	}
 
-	for name, want := range map[string]float64{"offset": 0, "limit": catalog.DefaultTagLimit} {
+	for name, want := range map[string]float64{"offset": 0, "limit": catalog.DefaultTagLimit, "min_count": DefaultMinCount} {
 		property, _ := props[name].(map[string]any)
 		if got, ok := property["default"].(float64); !ok || got != want {
 			t.Errorf("default for %q = %#v, want %v", name, property["default"], want)

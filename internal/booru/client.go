@@ -70,9 +70,10 @@ func (c *Client) Name() string {
 // a shorter final window, plus whether at least one match exists past it. The listing is page-based, so the window is
 // read from the one or two pages that contain it.
 //
-// Rows with no posts are dropped rather than returned. Danbooru's tag table is user-editable and carries concatenated
-// and punctuation-mangled rows that no caller wants; because the listing is count-ordered they are always the tail, so
-// paging stops as soon as one is seen.
+// Matches below query.MinCount are withheld rather than returned. Danbooru's tag table is user-editable and carries
+// concatenated and punctuation-mangled zero-post rows that no caller wants, but those rows are real canonical tags, so
+// the page reports how many were withheld instead of pretending they do not exist. Because the listing is
+// count-ordered they are always the tail, so paging stops as soon as one is seen.
 func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error) {
 	if strings.TrimSpace(query.Search) == "" {
 		return TagPage{}, fmt.Errorf("%s: tag search needs a search term", c.name)
@@ -82,12 +83,19 @@ func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error
 		return TagPage{}, fmt.Errorf("%s: tag search needs a positive limit, got %d", c.name, query.Limit)
 	}
 
+	floor := query.MinCount
+	if floor < 0 {
+		floor = 0
+	}
+
 	pageSize := c.pageSize()
 	skip := query.Offset % pageSize
 
 	// One item past the window decides whether more matches exist, so the window is read wider than it is returned.
 	wanted := skip + query.Limit + 1
 	collected := make([]Tag, 0, wanted)
+
+	window := TagPage{}
 
 	for page := query.Offset/pageSize + 1; len(collected) < wanted; page++ {
 		batch, err := c.searchPage(ctx, query, page, pageSize)
@@ -98,10 +106,15 @@ func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error
 		exhausted := len(batch) < pageSize
 
 		for _, tag := range batch {
-			if tag.Count <= 0 {
+			if tag.Count < floor {
 				exhausted = true
+				window.Withheld++
 
-				break
+				if tag.Count > window.WithheldBest {
+					window.WithheldBest = tag.Count
+				}
+
+				continue
 			}
 
 			collected = append(collected, tag)
@@ -113,8 +126,6 @@ func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error
 	}
 
 	sortTags(collected)
-
-	window := TagPage{}
 
 	if skip < len(collected) {
 		window.Tags = collected[skip:]

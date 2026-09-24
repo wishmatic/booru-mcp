@@ -15,11 +15,7 @@ func renderTags(out tagsOutput) string {
 	var b strings.Builder
 
 	for _, tag := range out.Tags {
-		fmt.Fprintf(&b, "- %s (%s): %d works", tag.Name, tag.Category, tag.Count)
-
-		if tag.AliasOf != "" {
-			fmt.Fprintf(&b, " [alias of %s]", tag.AliasOf)
-		}
+		fmt.Fprint(&b, renderTag(tag))
 
 		if len(tag.Implications) > 0 {
 			fmt.Fprintf(&b, " [implies %s]", strings.Join(tag.Implications, ", "))
@@ -35,10 +31,22 @@ func renderTags(out tagsOutput) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+func renderTag(tag tagOutput) string {
+	if tag.AliasOf == "" {
+		return fmt.Sprintf("- %s (%s): %d works", tag.Name, tag.Category, tag.Count)
+	}
+
+	if tag.CountIsTarget {
+		return fmt.Sprintf("- %s (%s): alias of %s (%d works there)", tag.Name, tag.Category, tag.AliasOf, tag.Count)
+	}
+
+	return fmt.Sprintf("- %s (%s): alias of %s", tag.Name, tag.Category, tag.AliasOf)
+}
+
 func renderEmpty(out tagsOutput) string {
 	switch out.Status {
 	case string(catalog.StatusNoSubstringMatch):
-		return fmt.Sprintf("No tag name contains %q.", out.Search)
+		return renderNoSubstringMatch(out)
 
 	case string(catalog.StatusExactNotFound):
 		return fmt.Sprintf("No tag named %q exists.", out.Search)
@@ -48,4 +56,26 @@ func renderEmpty(out tagsOutput) string {
 	}
 
 	return "No tags matched."
+}
+
+// renderNoSubstringMatch names the filter that emptied the page. A withheld canonical tag exists; saying only that the
+// substring matched nothing would assert that it does not.
+func renderNoSubstringMatch(out tagsOutput) string {
+	if out.Withheld == 0 {
+		return fmt.Sprintf("No tag name contains %q.", out.Search)
+	}
+
+	if out.Withheld == 1 {
+		return fmt.Sprintf(
+			"No tag name contains %q with at least %d works; one canonical match with %d works was hidden by the floor. "+
+				"Set min_count=0 to include it.",
+			out.Search, out.MinCount, out.WithheldBest,
+		)
+	}
+
+	return fmt.Sprintf(
+		"No tag name contains %q with at least %d works; %d canonical matches were hidden by the floor (the best has %d "+
+			"works). Set min_count=0 to include them.",
+		out.Search, out.MinCount, out.Withheld, out.WithheldBest,
+	)
 }

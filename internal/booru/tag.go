@@ -74,6 +74,9 @@ type Tag struct {
 	Count        int
 	AliasOf      string
 	Implications []string
+	// CountIsTarget marks a row whose Count belongs to AliasOf rather than to Name, so a caller does not read it as
+	// the alias' own work count.
+	CountIsTarget bool
 }
 
 func NormalizeTag(value string) string {

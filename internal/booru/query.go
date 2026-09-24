@@ -5,13 +5,18 @@ type TagQuery struct {
 	Categories []TagCategory
 	Offset     int
 	Limit      int
+	MinCount   int
 }
 
-// TagPage is one window of the count-ordered tag matches. More reports whether at least one match exists past the
-// window.
 type TagPage struct {
 	Tags []Tag
 	More bool
+
+	// Withheld counts matches the read pages held below the min-count floor. It is a lower bound: paging stops as soon
+	// as the count-ordered listing drops to the floor, so further matches are known to exist but are not counted.
+	Withheld int
+	// WithheldBest is the work count of the highest-ranked withheld match, or zero when none was withheld.
+	WithheldBest int
 }
 
 type Implication struct {

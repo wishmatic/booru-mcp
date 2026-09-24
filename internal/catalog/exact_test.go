@@ -51,8 +51,12 @@ func TestTagsExactResolvesAlias(t *testing.T) {
 		t.Errorf("alias row = %+v, want the alias carrying the target's count", alias)
 	}
 
-	if result.Tags[1].Name != "futanari" || result.Tags[1].AliasOf != "" {
-		t.Errorf("canonical row = %+v, want futanari", result.Tags[1])
+	if !alias.CountIsTarget {
+		t.Error("count_is_target = false, want the alias row to flag the borrowed count")
+	}
+
+	if result.Tags[1].Name != "futanari" || result.Tags[1].AliasOf != "" || result.Tags[1].CountIsTarget {
+		t.Errorf("canonical row = %+v, want futanari with its own count", result.Tags[1])
 	}
 }
 

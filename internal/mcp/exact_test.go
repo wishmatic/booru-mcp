@@ -105,9 +105,21 @@ func TestTagsExactAliasIsReported(t *testing.T) {
 		t.Errorf("tags = %+v, want the alias with the target's count", out.Tags)
 	}
 
+	if !out.Tags[0].CountIsTarget {
+		t.Error("count_is_target = false on the alias row, want the target's count flagged")
+	}
+
+	if out.Tags[1].CountIsTarget {
+		t.Error("count_is_target = true on the canonical row, want it false")
+	}
+
 	text, ok := result.Content[0].(*mcp.TextContent)
-	if ok && !strings.Contains(text.Text, "[alias of futanari]") {
-		t.Errorf("text %q does not name the alias target", text.Text)
+	if ok && !strings.Contains(text.Text, "alias of futanari (52264 works there)") {
+		t.Errorf("text %q does not attribute the count to the target", text.Text)
+	}
+
+	if ok && strings.Contains(text.Text, "dickgirl (general): 52264 works") {
+		t.Errorf("text %q reads as if dickgirl has its own work count", text.Text)
 	}
 }
 
@@ -131,6 +143,59 @@ func TestTagsRendersImplications(t *testing.T) {
 	text, ok := result.Content[0].(*mcp.TextContent)
 	if ok && !strings.Contains(text.Text, "[implies futanari, pov]") {
 		t.Errorf("text %q does not name the implications", text.Text)
+	}
+}
+
+func TestTagsRendersTheWithheldFilter(t *testing.T) {
+	source := &stubSource{page: booru.TagPage{Withheld: 1, WithheldBest: 0}}
+
+	result, out, err := handlerFor(t, source, catalog.Options{MaxLimit: 100, MaxOffset: 1000}).
+		tags(context.Background(), nil, tagsInput{Search: "ass_grabeye_contact"})
+	if err != nil {
+		t.Fatalf("tags() error: %v", err)
+	}
+
+	if out.Withheld != 1 || out.WithheldBest != 0 || out.MinCount != DefaultMinCount {
+		t.Fatalf("output = %+v, want the withheld row reported", out)
+	}
+
+	text, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("content = %#v, want text", result.Content[0])
+	}
+
+	if strings.Contains(text.Text, "No tag name contains \"ass_grabeye_contact\".") {
+		t.Errorf("text %q still asserts the tag does not exist", text.Text)
+	}
+
+	for _, want := range []string{"with at least 1 works", "hidden by the floor", "min_count=0"} {
+		if !strings.Contains(text.Text, want) {
+			t.Errorf("text %q does not contain %q", text.Text, want)
+		}
+	}
+}
+
+func TestTagsZeroFloorReturnsTheWithheldRow(t *testing.T) {
+	source := &stubSource{page: booru.TagPage{Tags: []booru.Tag{
+		{Name: "ass_grabeye_contact", Category: booru.CategoryGeneral, Count: 0},
+	}}}
+
+	_, out, err := handlerFor(t, source, catalog.Options{MaxLimit: 100, MaxOffset: 1000}).
+		tags(context.Background(), nil, tagsInput{Search: "ass_grabeye_contact", MinCount: intPtr(0)})
+	if err != nil {
+		t.Fatalf("tags() error: %v", err)
+	}
+
+	if source.query.MinCount != 0 {
+		t.Errorf("upstream min count = %d, want 0", source.query.MinCount)
+	}
+
+	if len(out.Tags) != 1 || out.Tags[0].Name != "ass_grabeye_contact" || out.Tags[0].Count != 0 {
+		t.Fatalf("tags = %+v, want the zero-work row returned", out.Tags)
+	}
+
+	if out.Withheld != 0 {
+		t.Errorf("withheld = %d, want none at a zero floor", out.Withheld)
 	}
 }
 

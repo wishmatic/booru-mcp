@@ -26,6 +26,7 @@ type TagsInput struct {
 	Search     string
 	Offset     int
 	Limit      int
+	MinCount   int
 	Exact      bool
 	Categories []booru.TagCategory
 }
@@ -37,6 +38,8 @@ type TagsResult struct {
 	Status       Status
 	AliasOf      string
 	SnapshotDate string
+	Withheld     int
+	WithheldBest int
 }
 
 func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error) {
@@ -57,11 +60,16 @@ func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error)
 		return TagsResult{}, err
 	}
 
+	if input.MinCount < 0 {
+		return TagsResult{}, fmt.Errorf("min_count must be zero or greater, got %d", input.MinCount)
+	}
+
 	query := booru.TagQuery{
 		Search:     search,
 		Categories: input.Categories,
 		Offset:     input.Offset,
 		Limit:      input.Limit,
+		MinCount:   input.MinCount,
 	}
 
 	window, err := s.source.SearchTags(ctx, query)
@@ -76,7 +84,11 @@ func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error)
 		status = StatusNoSubstringMatch
 	}
 
-	return s.result(search, tags, window.More, status, ""), nil
+	result := s.result(search, tags, window.More, status, "")
+	result.Withheld = window.Withheld
+	result.WithheldBest = window.WithheldBest
+
+	return result, nil
 }
 
 func (s *Service) result(search string, tags []booru.Tag, more bool, status Status, aliasOf string) TagsResult {

@@ -43,13 +43,40 @@ func TestSearchTagsOmitsCategoryWhenUnset(t *testing.T) {
 	}
 }
 
-func TestSearchTagsDropsZeroCountRows(t *testing.T) {
+func TestSearchTagsWithholdsTheZeroCountTail(t *testing.T) {
 	client := newTestClient(t, 100, func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`[
 			{"name":"real_a","category":0,"post_count":10},
 			{"name":"real_b","category":0,"post_count":5},
+			{"name":"real_c","category":0,"post_count":3},
 			{"name":"junk_compound","category":0,"post_count":0},
-			{"name":"real_c","category":0,"post_count":3}
+			{"name":"junk_more","category":0,"post_count":0}
+		]`))
+	})
+
+	page, err := client.SearchTags(context.Background(), TagQuery{Search: "real", Limit: 5, MinCount: 1})
+	if err != nil {
+		t.Fatalf("SearchTags() error: %v", err)
+	}
+
+	if len(page.Tags) != 3 || page.Tags[0].Name != "real_a" || page.Tags[2].Name != "real_c" {
+		t.Fatalf("tags = %+v, want the three rows at or above the floor", page.Tags)
+	}
+
+	if page.Withheld != 2 || page.WithheldBest != 0 {
+		t.Errorf("withheld = %d best = %d, want 2 and 0", page.Withheld, page.WithheldBest)
+	}
+
+	if page.More {
+		t.Error("More = true, want false once the floor drops the listing")
+	}
+}
+
+func TestSearchTagsReturnsTheZeroCountTailWhenTheFloorIsZero(t *testing.T) {
+	client := newTestClient(t, 100, func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"name":"real_a","category":0,"post_count":10},
+			{"name":"junk_compound","category":0,"post_count":0}
 		]`))
 	})
 
@@ -58,12 +85,12 @@ func TestSearchTagsDropsZeroCountRows(t *testing.T) {
 		t.Fatalf("SearchTags() error: %v", err)
 	}
 
-	if len(page.Tags) != 2 || page.Tags[0].Name != "real_a" || page.Tags[1].Name != "real_b" {
-		t.Fatalf("tags = %+v, want only the two rows above the zero-count row", page.Tags)
+	if len(page.Tags) != 2 || page.Tags[1].Name != "junk_compound" || page.Tags[1].Count != 0 {
+		t.Fatalf("tags = %+v, want the zero-count row included without a floor", page.Tags)
 	}
 
-	if page.More {
-		t.Error("More = true, want false once the zero-count tail is reached")
+	if page.Withheld != 0 {
+		t.Errorf("withheld = %d, want none at a zero floor", page.Withheld)
 	}
 }
 

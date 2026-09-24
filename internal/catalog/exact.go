@@ -44,6 +44,8 @@ func (s *Service) exact(ctx context.Context, search string, categories []booru.T
 	aliasRow := tag
 	aliasRow.Name = search
 	aliasRow.AliasOf = aliasOf
+	aliasRow.Implications = []string{}
+	aliasRow.CountIsTarget = true
 
 	return s.result(search, []booru.Tag{aliasRow, tag}, false, StatusOK, aliasOf), nil
 }
