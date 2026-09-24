@@ -44,6 +44,12 @@ func registerTags(srv *mcp.Server, h *handlers) {
 			"is one page of the match list: use `offset` and `limit` to walk it and `more` to tell whether another page " +
 			"exists. An empty `tags` array with `more` false means no tags match.",
 		InputSchema: tagsSchema(),
+		Annotations: &mcp.ToolAnnotations{
+			ReadOnlyHint:    true,
+			DestructiveHint: new(false),
+			IdempotentHint:  true,
+			OpenWorldHint:   new(true),
+		},
 	}, h.tags)
 }
 

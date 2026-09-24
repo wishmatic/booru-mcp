@@ -88,6 +88,36 @@ func TestRegistersOnlyTheTagsTool(t *testing.T) {
 	}
 }
 
+func TestTagsToolSetsEveryHint(t *testing.T) {
+	srv := newTestServer(t, &stubSource{}, catalog.Options{MaxLimit: 100, MaxOffset: 1000})
+
+	result, err := connectSession(t, srv).ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("ListTools() error: %v", err)
+	}
+
+	annotations := result.Tools[0].Annotations
+	if annotations == nil {
+		t.Fatal("annotations = nil, want all four hints set")
+	}
+
+	if !annotations.ReadOnlyHint {
+		t.Error("readOnlyHint = false, want true")
+	}
+
+	if annotations.DestructiveHint == nil || *annotations.DestructiveHint {
+		t.Errorf("destructiveHint = %v, want an explicit false", annotations.DestructiveHint)
+	}
+
+	if !annotations.IdempotentHint {
+		t.Error("idempotentHint = false, want true")
+	}
+
+	if annotations.OpenWorldHint == nil || !*annotations.OpenWorldHint {
+		t.Errorf("openWorldHint = %v, want an explicit true", annotations.OpenWorldHint)
+	}
+}
+
 func TestTagsSchemaShape(t *testing.T) {
 	srv := newTestServer(t, &stubSource{}, catalog.Options{MaxLimit: 100, MaxOffset: 1000})
 
