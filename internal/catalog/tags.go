@@ -19,6 +19,7 @@ const (
 	StatusOK               Status = "ok"
 	StatusNoSubstringMatch Status = "no_substring_match"
 	StatusExactNotFound    Status = "exact_not_found"
+	StatusOffsetPastEnd    Status = "offset_past_end"
 	StatusUnknown          Status = "unknown"
 )
 
@@ -81,7 +82,15 @@ func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error)
 	tags := s.enrich(s.filterBlocked(window.Tags))
 
 	status := StatusOK
-	if len(tags) == 0 {
+
+	switch {
+	case len(tags) > 0:
+		status = StatusOK
+
+	case input.Offset > 0 && window.Matched:
+		status = StatusOffsetPastEnd
+
+	default:
 		status = StatusNoSubstringMatch
 	}
 

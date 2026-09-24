@@ -96,11 +96,16 @@ func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error
 	collected := make([]Tag, 0, wanted)
 
 	window := TagPage{}
+	sawRows := false
 
 	for page := query.Offset/pageSize + 1; len(collected) < wanted; page++ {
 		batch, err := c.searchPage(ctx, query, page, pageSize)
 		if err != nil {
 			return TagPage{}, err
+		}
+
+		if len(batch) > 0 {
+			sawRows = true
 		}
 
 		exhausted := len(batch) < pageSize
@@ -124,6 +129,20 @@ func (c *Client) SearchTags(ctx context.Context, query TagQuery) (TagPage, error
 			break
 		}
 	}
+
+	// An empty page at a non-zero offset cannot say on its own whether the search matches nothing or the offset simply
+	// overtook a short list, so it asks once. This only happens when the offset page is empty, so the common search
+	// stays one request.
+	if !sawRows && query.Offset > 0 {
+		probe, err := c.searchPage(ctx, query, 1, 1)
+		if err != nil {
+			return TagPage{}, err
+		}
+
+		sawRows = len(probe) > 0
+	}
+
+	window.Matched = sawRows
 
 	sortTags(collected)
 

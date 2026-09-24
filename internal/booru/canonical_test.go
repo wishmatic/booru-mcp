@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -118,6 +119,80 @@ func TestSearchTagsOrdersEqualCountsByName(t *testing.T) {
 		if page.Tags[i].Name != name {
 			t.Errorf("tags[%d] = %q, want %q", i, page.Tags[i].Name, name)
 		}
+	}
+}
+
+func TestSearchTagsMatchedWhenOffsetRunsPastTheEnd(t *testing.T) {
+	client := newTestClient(t, 25, func(w http.ResponseWriter, r *http.Request) {
+		serveTagPage(w, r, tagNames(3))
+	})
+
+	page, err := client.SearchTags(context.Background(), TagQuery{Search: "blue", Offset: 10, Limit: 5})
+	if err != nil {
+		t.Fatalf("SearchTags() error: %v", err)
+	}
+
+	if len(page.Tags) != 0 || !page.Matched || page.More {
+		t.Errorf("page = %+v, want an empty window that still reports a match", page)
+	}
+}
+
+func TestSearchTagsOffsetWithinRangeIsNotPastEnd(t *testing.T) {
+	client := newTestClient(t, 25, func(w http.ResponseWriter, r *http.Request) {
+		serveTagPage(w, r, tagNames(30))
+	})
+
+	page, err := client.SearchTags(context.Background(), TagQuery{Search: "blue", Offset: 5, Limit: 5})
+	if err != nil {
+		t.Fatalf("SearchTags() error: %v", err)
+	}
+
+	if len(page.Tags) != 5 || page.Tags[0].Name != "blue_tag_05" || !page.Matched {
+		t.Errorf("page = %+v, want a normal window at offset 5", page)
+	}
+}
+
+func TestSearchTagsUnmatchedAtANonZeroOffset(t *testing.T) {
+	var calls atomic.Int64
+
+	client := newTestClient(t, 25, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write([]byte(`[]`))
+	})
+
+	page, err := client.SearchTags(context.Background(), TagQuery{Search: "qzxwvjklm", Offset: 1000, Limit: 5})
+	if err != nil {
+		t.Fatalf("SearchTags() error: %v", err)
+	}
+
+	if page.Matched {
+		t.Error("Matched = true, want a genuinely unmatched search even at a large offset")
+	}
+
+	if got := calls.Load(); got != 2 {
+		t.Errorf("requests = %d, want the offset page plus one probe", got)
+	}
+}
+
+func TestSearchTagsUnmatchedAtZeroOffsetMakesOneRequest(t *testing.T) {
+	var calls atomic.Int64
+
+	client := newTestClient(t, 25, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write([]byte(`[]`))
+	})
+
+	page, err := client.SearchTags(context.Background(), TagQuery{Search: "qzxwvjklm", Limit: 5})
+	if err != nil {
+		t.Fatalf("SearchTags() error: %v", err)
+	}
+
+	if page.Matched {
+		t.Error("Matched = true, want a genuinely unmatched search")
+	}
+
+	if got := calls.Load(); got != 1 {
+		t.Errorf("requests = %d, want no probe at offset zero", got)
 	}
 }
 

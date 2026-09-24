@@ -254,6 +254,35 @@ func TestUnknownStatusThroughSession(t *testing.T) {
 	}
 }
 
+func TestTagsRendersOffsetPastEnd(t *testing.T) {
+	source := &stubSource{page: booru.TagPage{Matched: true, Withheld: 100}}
+
+	result, out, err := handlerFor(t, source, catalog.Options{MaxLimit: 100, MaxOffset: 1000}).
+		tags(context.Background(), nil, tagsInput{Search: "blue hair", Offset: intPtr(1000)})
+	if err != nil {
+		t.Fatalf("tags() error: %v", err)
+	}
+
+	if out.Status != string(catalog.StatusOffsetPastEnd) {
+		t.Fatalf("status = %q, want offset_past_end", out.Status)
+	}
+
+	text, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("content = %#v, want text", result.Content[0])
+	}
+
+	if strings.Contains(text.Text, "No tag name contains") {
+		t.Errorf("text %q uses the no-match wording for an offset past the end", text.Text)
+	}
+
+	for _, want := range []string{"Offset 1000 is past the last result", "no further page"} {
+		if !strings.Contains(text.Text, want) {
+			t.Errorf("text %q does not contain %q", text.Text, want)
+		}
+	}
+}
+
 func TestTagsRendersHonestEmpties(t *testing.T) {
 	tests := map[string]struct {
 		source   *stubSource

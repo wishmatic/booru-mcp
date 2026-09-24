@@ -50,8 +50,8 @@ func registerTags(srv *mcp.Server, h *handlers) {
 			"differ because the underlying data changes.\n" +
 			"- The response is one page: use `offset` and `limit` to walk it and `more` to tell whether another page " +
 			"exists.\n" +
-			"- `status` distinguishes a real empty page (`no_substring_match`, `exact_not_found`) from an unconfirmed " +
-			"one (`unknown`).",
+			"- `status` distinguishes a real empty page (`no_substring_match`, `exact_not_found`) from an offset that ran " +
+			"past the last match (`offset_past_end`) and from an unconfirmed one (`unknown`).",
 		InputSchema: tagsSchema(),
 		Annotations: &mcp.ToolAnnotations{
 			ReadOnlyHint:    true,

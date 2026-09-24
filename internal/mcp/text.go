@@ -52,6 +52,12 @@ func renderEmpty(out tagsOutput) string {
 	case string(catalog.StatusNoSubstringMatch):
 		return renderNoSubstringMatch(out)
 
+	case string(catalog.StatusOffsetPastEnd):
+		return fmt.Sprintf(
+			"Offset %d is past the last result for %q; there is no further page. Try a smaller offset.",
+			out.Offset, out.Search,
+		) + renderSynonyms(out)
+
 	case string(catalog.StatusExactNotFound):
 		return fmt.Sprintf("No tag named %q exists.", out.Search)
 

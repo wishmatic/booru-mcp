@@ -53,8 +53,9 @@ matching can never find: searching `piss` reports `pee` and `urine`. Synonyms ar
 `category`; call the tool with `exact: true` on one to get its count.
 
 An empty `tags` array is accompanied by a `status` that says whether the search genuinely matched nothing
-(`no_substring_match`), whether an exact name was absent (`exact_not_found`), or whether an unanswerable case was
-reached (`unknown`).
+(`no_substring_match`), whether an exact name was absent (`exact_not_found`), whether the offset ran past the last
+match (`offset_past_end`), or whether an unanswerable case was reached (`unknown`). An offset past the end is never
+reported as "no such tag".
 
 Use `exact: true` to ask whether one tag exists. It is the only reliable existence check: a substring miss proves
 nothing. Aliases resolve to their target, reported as `alias_of` and the target's count (`count_is_target` marks a
