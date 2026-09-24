@@ -96,7 +96,7 @@ func TestValidateRejectsOutOfRangeValues(t *testing.T) {
 		"zero max limit":    {apply: func(c *Config) { c.MaxLimit = 0 }, wantNamed: "MAX_LIMIT"},
 		"max limit too big": {apply: func(c *Config) { c.MaxLimit = 101 }, wantNamed: "MAX_LIMIT"},
 		"zero max offset":   {apply: func(c *Config) { c.MaxOffset = 0 }, wantNamed: "MAX_OFFSET"},
-		"negative refresh":  {apply: func(c *Config) { c.ImplicationIndexRefreshHours = -1 }, wantNamed: "IMPLICATION_INDEX_REFRESH_HOURS"},
+		"negative refresh":  {apply: func(c *Config) { c.RelationIndexRefreshHours = -1 }, wantNamed: "RELATION_INDEX_REFRESH_HOURS"},
 	}
 
 	for name, tt := range tests {
@@ -112,7 +112,7 @@ func TestValidateRejectsOutOfRangeValues(t *testing.T) {
 	}
 }
 
-func TestImplicationIndexInterval(t *testing.T) {
+func TestRelationIndexInterval(t *testing.T) {
 	tests := map[int]time.Duration{
 		0:  0,
 		1:  time.Hour,
@@ -121,10 +121,10 @@ func TestImplicationIndexInterval(t *testing.T) {
 
 	for hours, want := range tests {
 		cfg := testConfig()
-		cfg.ImplicationIndexRefreshHours = hours
+		cfg.RelationIndexRefreshHours = hours
 
-		if got := cfg.ImplicationIndexInterval(); got != want {
-			t.Errorf("ImplicationIndexInterval() for %d = %v, want %v", hours, got, want)
+		if got := cfg.RelationIndexInterval(); got != want {
+			t.Errorf("RelationIndexInterval() for %d = %v, want %v", hours, got, want)
 		}
 	}
 }
@@ -153,8 +153,8 @@ func TestLoadValues(t *testing.T) {
 		t.Fatalf("Load() bounds = %d/%d, want 42/7", cfg.MaxLimit, cfg.MaxOffset)
 	}
 
-	if cfg.ImplicationIndexInterval() != 24*time.Hour {
-		t.Errorf("ImplicationIndexInterval() = %v, want the 24 hour default", cfg.ImplicationIndexInterval())
+	if cfg.RelationIndexInterval() != 24*time.Hour {
+		t.Errorf("RelationIndexInterval() = %v, want the 24 hour default", cfg.RelationIndexInterval())
 	}
 
 	if !cfg.DanbooruAuthenticated() {

@@ -10,11 +10,27 @@ import (
 )
 
 type stubRelations struct {
-	byName map[string][]string
+	byName    map[string][]string
+	synonyms  map[string][]string
+	canonical map[string]string
 }
 
 func (s stubRelations) Implications(name string) []string {
 	return s.byName[name]
+}
+
+func (s stubRelations) Synonyms(name string) []string {
+	return s.synonyms[name]
+}
+
+func (s stubRelations) Canonical(name string) (string, bool) {
+	target, ok := s.canonical[name]
+
+	return target, ok
+}
+
+func (s stubRelations) Ready() bool {
+	return true
 }
 
 func fixedClock() func() time.Time {
@@ -30,7 +46,10 @@ func TestTagsExactResolvesAlias(t *testing.T) {
 	}
 
 	opts := testOptions()
-	opts.Relations = stubRelations{byName: map[string][]string{"futanari": {"futanari"}}}
+	opts.Relations = stubRelations{
+		byName:    map[string][]string{"futanari": {"futanari"}},
+		canonical: map[string]string{"dickgirl": "futanari"},
+	}
 	opts.Clock = fixedClock()
 
 	result, err := New(source, opts).Tags(context.Background(), TagsInput{Search: "dickgirl", Exact: true})

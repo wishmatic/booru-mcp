@@ -23,3 +23,8 @@ type Implication struct {
 	Antecedent string
 	Consequent string
 }
+
+type Alias struct {
+	Antecedent string
+	Consequent string
+}

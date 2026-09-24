@@ -24,6 +24,10 @@ func renderTags(out tagsOutput) string {
 		b.WriteString("\n")
 	}
 
+	if len(out.Synonyms) > 0 {
+		fmt.Fprintf(&b, "\nAlso known as: %s.\n", strings.Join(out.Synonyms, ", "))
+	}
+
 	if out.More {
 		fmt.Fprintf(&b, "\nMore matches exist; continue with offset %d.\n", out.Offset+len(out.Tags))
 	}
@@ -58,11 +62,19 @@ func renderEmpty(out tagsOutput) string {
 	return "No tags matched."
 }
 
+func renderSynonyms(out tagsOutput) string {
+	if len(out.Synonyms) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf(" Known aliases: %s.", strings.Join(out.Synonyms, ", "))
+}
+
 // renderNoSubstringMatch names the filter that emptied the page. A withheld canonical tag exists; saying only that the
 // substring matched nothing would assert that it does not.
 func renderNoSubstringMatch(out tagsOutput) string {
 	if out.Withheld == 0 {
-		return fmt.Sprintf("No tag name contains %q.", out.Search)
+		return fmt.Sprintf("No tag name contains %q.", out.Search) + renderSynonyms(out)
 	}
 
 	if out.Withheld == 1 {
@@ -70,12 +82,12 @@ func renderNoSubstringMatch(out tagsOutput) string {
 			"No tag name contains %q with at least %d works; one canonical match with %d works was hidden by the floor. "+
 				"Set min_count=0 to include it.",
 			out.Search, out.MinCount, out.WithheldBest,
-		)
+		) + renderSynonyms(out)
 	}
 
 	return fmt.Sprintf(
 		"No tag name contains %q with at least %d works; %d canonical matches were hidden by the floor (the best has %d "+
 			"works). Set min_count=0 to include them.",
 		out.Search, out.MinCount, out.Withheld, out.WithheldBest,
-	)
+	) + renderSynonyms(out)
 }

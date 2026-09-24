@@ -11,7 +11,7 @@ import (
 // bare zero. An alias that resolves to a missing tag still reports the alias, which is what makes it distinct from a
 // genuine miss.
 func (s *Service) exact(ctx context.Context, search string, categories []booru.TagCategory) (TagsResult, error) {
-	aliasOf, aliased, aliasErr := s.source.AliasTarget(ctx, search)
+	aliasOf, aliased, aliasErr := s.canonical(ctx, search)
 
 	lookup := search
 	if aliased {
@@ -63,8 +63,8 @@ func (s *Service) exactMiss(search string, aliased bool, aliasOf string) TagsRes
 // exactImplications prefers the local graph but falls back to one upstream call, so an exact answer is never blocked on
 // whether the background index has been built yet.
 func (s *Service) exactImplications(ctx context.Context, name string) []string {
-	if known := knownImplications(s.opts.Relations, name); len(known) > 0 {
-		return known
+	if s.opts.Relations != nil && s.opts.Relations.Ready() {
+		return knownImplications(s.opts.Relations, name)
 	}
 
 	known, err := s.source.Implications(ctx, name)
@@ -73,6 +73,18 @@ func (s *Service) exactImplications(ctx context.Context, name string) []string {
 	}
 
 	return known
+}
+
+// canonical resolves name through the local alias graph when it is ready, and otherwise asks upstream, so a built index
+// removes the alias lookup from the request path and an unbuilt one still answers correctly.
+func (s *Service) canonical(ctx context.Context, name string) (string, bool, error) {
+	if s.opts.Relations != nil && s.opts.Relations.Ready() {
+		target, ok := s.opts.Relations.Canonical(name)
+
+		return target, ok, nil
+	}
+
+	return s.source.AliasTarget(ctx, name)
 }
 
 func matchesCategory(categories []booru.TagCategory, category booru.TagCategory) bool {

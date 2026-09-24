@@ -24,10 +24,14 @@ type TagSource interface {
 	Implications(ctx context.Context, name string) ([]string, error)
 }
 
-// RelationIndex answers implications from the ingested graph without touching the network. A nil index is valid and
-// simply means no implications are known locally.
+// RelationIndex answers the canonical alias and implication graphs from the ingested index without touching the
+// network. A nil index is valid and simply means nothing is known locally. Ready distinguishes "no such alias" from
+// "not crawled yet", so callers can decide whether to fall back to an upstream lookup.
 type RelationIndex interface {
 	Implications(name string) []string
+	Synonyms(name string) []string
+	Canonical(name string) (string, bool)
+	Ready() bool
 }
 
 type Options struct {

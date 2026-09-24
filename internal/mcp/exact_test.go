@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -10,6 +11,15 @@ import (
 	"github.com/wishmatic/booru-mcp/internal/booru"
 	"github.com/wishmatic/booru-mcp/internal/catalog"
 )
+
+type stubRelations struct {
+	synonyms []string
+}
+
+func (s stubRelations) Implications(string) []string    { return nil }
+func (s stubRelations) Synonyms(string) []string        { return s.synonyms }
+func (s stubRelations) Canonical(string) (string, bool) { return "", false }
+func (s stubRelations) Ready() bool                     { return true }
 
 func boolPtr(value bool) *bool {
 	return &value
@@ -196,6 +206,51 @@ func TestTagsZeroFloorReturnsTheWithheldRow(t *testing.T) {
 
 	if out.Withheld != 0 {
 		t.Errorf("withheld = %d, want none at a zero floor", out.Withheld)
+	}
+}
+
+func TestTagsRendersSynonyms(t *testing.T) {
+	opts := catalog.Options{MaxLimit: 100, MaxOffset: 1000, Relations: stubRelations{synonyms: []string{"pee", "urine"}}}
+
+	result, out, err := handlerFor(t, &stubSource{}, opts).
+		tags(context.Background(), nil, tagsInput{Search: "piss"})
+	if err != nil {
+		t.Fatalf("tags() error: %v", err)
+	}
+
+	if len(out.Synonyms) != 2 || out.Synonyms[0] != "pee" {
+		t.Fatalf("synonyms = %v, want [pee urine]", out.Synonyms)
+	}
+
+	text, ok := result.Content[0].(*mcp.TextContent)
+	if !ok || !strings.Contains(text.Text, "Known aliases: pee, urine.") {
+		t.Errorf("text = %#v, want it to name the synonyms", result.Content[0])
+	}
+}
+
+func TestUnknownStatusThroughSession(t *testing.T) {
+	source := &stubSource{aliasErr: errors.New("alias endpoint down")}
+	srv := newTestServer(t, source, catalog.Options{MaxLimit: 100, MaxOffset: 1000})
+
+	result, err := connectSession(t, srv).CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "tags",
+		Arguments: map[string]any{"search": "maybe_tag", "exact": true},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() error: %v", err)
+	}
+
+	if result.IsError {
+		t.Fatalf("tags returned an error: %+v", result.Content)
+	}
+
+	raw, err := json.Marshal(result.StructuredContent)
+	if err != nil {
+		t.Fatalf("marshal structured content: %v", err)
+	}
+
+	if !strings.Contains(string(raw), `"status":"unknown"`) {
+		t.Errorf("structured content = %s, want status unknown rather than a definitive miss", raw)
 	}
 }
 

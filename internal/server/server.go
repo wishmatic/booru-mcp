@@ -28,7 +28,7 @@ type Server struct {
 	log       *zap.Logger
 	router    *chi.Mux
 	http      *http.Server
-	relations *booru.ImplicationIndex
+	relations *booru.RelationIndex
 	indexCtx  context.Context
 	stopIndex context.CancelFunc
 }
@@ -47,14 +47,14 @@ func New(cfg config.Config, log *zap.Logger) (*Server, error) {
 		return nil, err
 	}
 
-	return newWithProvider(cfg, log, provider, booru.NewImplicationIndex(provider, cfg.ImplicationIndexInterval()))
+	return newWithProvider(cfg, log, provider, booru.NewRelationIndex(provider, cfg.RelationIndexInterval()))
 }
 
 func newWithProvider(
 	cfg config.Config,
 	log *zap.Logger,
 	provider *booru.Client,
-	relations *booru.ImplicationIndex,
+	relations *booru.RelationIndex,
 ) (*Server, error) {
 	service := catalog.New(provider, catalog.Options{
 		BlockedTags: cfg.BlockedTags(),
@@ -143,7 +143,7 @@ func buildProvider(cfg config.Config, log *zap.Logger) (*booru.Client, error) {
 }
 
 func (s *Server) Run() error {
-	s.startImplicationIndex()
+	s.startRelationIndex()
 
 	s.log.Info("server listening", zap.String("addr", s.cfg.Addr()))
 
@@ -154,15 +154,15 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// startImplicationIndex crawls the canonical implication graph in the background. It is started here rather than in New
-// so that constructing a server never makes a network call, which keeps tests and offline use quiet.
-func (s *Server) startImplicationIndex() {
+// startRelationIndex crawls the canonical alias and implication graphs in the background. It is started here rather
+// than in New so that constructing a server never makes a network call, which keeps tests and offline use quiet.
+func (s *Server) startRelationIndex() {
 	if s.relations == nil {
 		return
 	}
 
 	s.relations.Start(s.indexCtx, func(err error) {
-		s.log.Warn("implication index refresh failed", zap.Error(err))
+		s.log.Warn("relation index refresh failed", zap.Error(err))
 	})
 }
 

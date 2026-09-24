@@ -126,7 +126,7 @@ func TestRunDoesNotCrawlWhenTheIndexIsDisabled(t *testing.T) {
 	t.Cleanup(upstream.Close)
 
 	cfg := testConfig()
-	cfg.ImplicationIndexRefreshHours = 0
+	cfg.RelationIndexRefreshHours = 0
 
 	transport, err := fetch.New(fetch.Config{BaseURL: upstream.URL, Limiter: noopLimiter{}})
 	if err != nil {
@@ -134,25 +134,25 @@ func TestRunDoesNotCrawlWhenTheIndexIsDisabled(t *testing.T) {
 	}
 
 	provider := booru.New(booru.Config{BaseURL: upstream.URL, MaxLimit: cfg.MaxLimit, HTTP: transport})
-	index := booru.NewImplicationIndex(provider, cfg.ImplicationIndexInterval())
+	index := booru.NewRelationIndex(provider, cfg.RelationIndexInterval())
 
 	srv, err := newWithProvider(cfg, zap.NewNop(), provider, index)
 	if err != nil {
 		t.Fatalf("newWithProvider() error: %v", err)
 	}
 
-	srv.startImplicationIndex()
+	srv.startRelationIndex()
 
 	if got := calls.Load(); got != 0 {
 		t.Errorf("upstream calls = %d, want none while the index is disabled", got)
 	}
 }
 
-func TestStartImplicationIndexWithoutAnIndexIsSafe(t *testing.T) {
+func TestStartRelationIndexWithoutAnIndexIsSafe(t *testing.T) {
 	srv := newTestServer(t, testConfig(), "http://127.0.0.1:1")
 
 	srv.relations = nil
-	srv.startImplicationIndex()
+	srv.startRelationIndex()
 
 	if err := srv.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Shutdown() error: %v", err)

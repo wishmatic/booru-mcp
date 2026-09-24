@@ -40,6 +40,7 @@ type TagsResult struct {
 	SnapshotDate string
 	Withheld     int
 	WithheldBest int
+	Synonyms     []string
 }
 
 func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error) {
@@ -87,6 +88,7 @@ func (s *Service) Tags(ctx context.Context, input TagsInput) (TagsResult, error)
 	result := s.result(search, tags, window.More, status, "")
 	result.Withheld = window.Withheld
 	result.WithheldBest = window.WithheldBest
+	result.Synonyms = s.synonyms(search, tags)
 
 	return result, nil
 }
@@ -124,6 +126,32 @@ func knownImplications(index RelationIndex, name string) []string {
 	}
 
 	return known
+}
+
+// synonyms surfaces the canonical names the search is also known by, which substring matching alone can never find. It
+// is index-only: recall must not add an upstream request to every search, so an unbuilt index simply reports nothing.
+func (s *Service) synonyms(search string, tags []booru.Tag) []string {
+	if s.opts.Relations == nil || !s.opts.Relations.Ready() {
+		return []string{}
+	}
+
+	shown := make(map[string]bool, len(tags))
+
+	for _, tag := range tags {
+		shown[tag.Name] = true
+	}
+
+	out := make([]string, 0)
+
+	for _, name := range s.opts.Relations.Synonyms(search) {
+		if name == search || shown[name] || s.blocked[name] {
+			continue
+		}
+
+		out = append(out, name)
+	}
+
+	return out
 }
 
 func validateCategories(categories []booru.TagCategory) error {

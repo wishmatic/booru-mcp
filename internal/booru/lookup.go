@@ -95,6 +95,38 @@ func (c *Client) Implications(ctx context.Context, name string) ([]string, error
 // ImplicationPage reads one page of the active implication graph. The caller drives the page walk, so the crawl is
 // owned by the index rather than by the client.
 func (c *Client) ImplicationPage(ctx context.Context, page, limit int) ([]Implication, error) {
+	raw, err := c.relationPage(ctx, "/tag_implications.json", page, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	relations := make([]Implication, 0, len(raw))
+
+	for _, item := range raw {
+		relations = append(relations, Implication{Antecedent: item.Antecedent, Consequent: item.Consequent})
+	}
+
+	return relations, nil
+}
+
+// AliasPage reads one page of the active alias graph.
+func (c *Client) AliasPage(ctx context.Context, page, limit int) ([]Alias, error) {
+	raw, err := c.relationPage(ctx, "/tag_aliases.json", page, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	aliases := make([]Alias, 0, len(raw))
+
+	for _, item := range raw {
+		aliases = append(aliases, Alias{Antecedent: item.Antecedent, Consequent: item.Consequent})
+	}
+
+	return aliases, nil
+}
+
+// relationPage reads one status-filtered page of a relation table, dropping rows that are missing either name.
+func (c *Client) relationPage(ctx context.Context, path string, page, limit int) ([]relation, error) {
 	params := url.Values{}
 	params.Set("search[status]", "active")
 	params.Set("only", relationFields)
@@ -106,12 +138,12 @@ func (c *Client) ImplicationPage(ctx context.Context, page, limit int) ([]Implic
 
 	c.auth(params)
 
-	raw, err := fetch.GetJSON[[]relationJSON](ctx, c.http, c.name, "/tag_implications.json", params)
+	raw, err := fetch.GetJSON[[]relationJSON](ctx, c.http, c.name, path, params)
 	if err != nil {
 		return nil, c.apiError(err)
 	}
 
-	relations := make([]Implication, 0, len(raw))
+	relations := make([]relation, 0, len(raw))
 
 	for _, item := range raw {
 		antecedent := NormalizeTag(item.AntecedentName)
@@ -121,7 +153,7 @@ func (c *Client) ImplicationPage(ctx context.Context, page, limit int) ([]Implic
 			continue
 		}
 
-		relations = append(relations, Implication{Antecedent: antecedent, Consequent: consequent})
+		relations = append(relations, relation{Antecedent: antecedent, Consequent: consequent})
 	}
 
 	return relations, nil
@@ -149,4 +181,9 @@ func (c *Client) consequents(ctx context.Context, path, antecedent string, limit
 	}
 
 	return out, nil
+}
+
+type relation struct {
+	Antecedent string
+	Consequent string
 }

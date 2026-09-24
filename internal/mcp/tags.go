@@ -28,30 +28,6 @@ type tagsInput struct {
 	Categories []string `json:"category,omitempty" jsonschema:"optional: keep only these categories; any of general, artist, copyright, character, meta"`
 }
 
-type tagsOutput struct {
-	Search       string      `json:"search"`
-	Exact        bool        `json:"exact"`
-	Status       string      `json:"status"`
-	SnapshotDate string      `json:"snapshot_date"`
-	Offset       int         `json:"offset"`
-	Limit        int         `json:"limit"`
-	MinCount     int         `json:"min_count"`
-	More         bool        `json:"more"`
-	AliasOf      string      `json:"alias_of"`
-	Withheld     int         `json:"withheld"`
-	WithheldBest int         `json:"withheld_best_count"`
-	Tags         []tagOutput `json:"tags"`
-}
-
-type tagOutput struct {
-	Name          string   `json:"name"`
-	Category      string   `json:"category"`
-	Count         int      `json:"count"`
-	CountIsTarget bool     `json:"count_is_target"`
-	AliasOf       string   `json:"alias_of"`
-	Implications  []string `json:"implications"`
-}
-
 func registerTags(srv *mcp.Server, h *handlers) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "tags",
@@ -61,6 +37,9 @@ func registerTags(srv *mcp.Server, h *handlers) {
 			"table also holds concatenated and punctuation-mangled names, and those are usually the zero-work tail. A " +
 			"withheld tag still exists: `withheld` and `withheld_best_count` report what the floor removed, and " +
 			"`min_count: 0` returns it.\n" +
+			"- `synonyms` lists canonical tags the search is also known by, from Danbooru's alias graph (for example `piss` " +
+			"reports `pee`). Substring matching alone can never find those names. Synonyms are names only and are not subject " +
+			"to `category`; use `exact` on one to get its count.\n" +
 			"- Set `exact` to true to ask whether one exact tag exists. This is the only reliable existence check: a " +
 			"substring miss proves nothing about whether a real tag exists. Exact mode resolves aliases and reports the " +
 			"target's count.\n" +
@@ -145,6 +124,7 @@ func (h *handlers) tags(
 		AliasOf:      result.AliasOf,
 		Withheld:     result.Withheld,
 		WithheldBest: result.WithheldBest,
+		Synonyms:     nonNilStrings(result.Synonyms),
 		Tags:         toTagOutputs(result.Tags),
 	}
 
@@ -191,26 +171,4 @@ func setCategoryEnum(schema *jsonschema.Schema) {
 	}
 
 	property.Items.Enum = allowed
-}
-
-func toTagOutputs(tags []booru.Tag) []tagOutput {
-	out := make([]tagOutput, 0, len(tags))
-
-	for _, tag := range tags {
-		implications := tag.Implications
-		if implications == nil {
-			implications = []string{}
-		}
-
-		out = append(out, tagOutput{
-			Name:          tag.Name,
-			Category:      tag.Category.String(),
-			Count:         tag.Count,
-			CountIsTarget: tag.CountIsTarget,
-			AliasOf:       tag.AliasOf,
-			Implications:  implications,
-		})
-	}
-
-	return out
 }

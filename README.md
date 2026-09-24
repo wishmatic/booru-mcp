@@ -29,6 +29,7 @@ Results come back ordered by work count (name ascending on ties) as one page of 
     "alias_of": "",
     "withheld": 0,
     "withheld_best_count": 0,
+    "synonyms": [],
     "tags": [
         {
             "name": "blue_hair",
@@ -47,6 +48,10 @@ Walk the list with `offset` and stop when `more` is false. Substring results exc
 names. Those rows are still real canonical tags, so `withheld` and `withheld_best_count` report what the floor removed,
 and `min_count: 0` returns them; an empty page is never phrased as proof that the tag does not exist.
 
+`synonyms` lists canonical tags the search is also known by, taken from Danbooru's alias graph, which substring
+matching can never find: searching `piss` reports `pee` and `urine`. Synonyms are names only and are not subject to
+`category`; call the tool with `exact: true` on one to get its count.
+
 An empty `tags` array is accompanied by a `status` that says whether the search genuinely matched nothing
 (`no_substring_match`), whether an exact name was absent (`exact_not_found`), or whether an unanswerable case was
 reached (`unknown`).
@@ -56,8 +61,8 @@ nothing. Aliases resolve to their target, reported as `alias_of` and the target'
 count that belongs to the target rather than to the named tag), and each result carries the `implications` Danbooru
 knows for it. Counts are read live, so `snapshot_date` records the date they were read.
 
-Every call is live; nothing is cached, except the implication graph, which is crawled in the background and refreshed
-on `IMPLICATION_INDEX_REFRESH_HOURS`. An upstream failure is reported as an error rather than as an empty page.
+Every call is live; the only cached data is the alias and implication graph, which is crawled in the background and
+refreshed on `RELATION_INDEX_REFRESH_HOURS`. An upstream failure is reported as an error rather than as an empty page.
 
 ## Usage
 

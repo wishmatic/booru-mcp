@@ -38,9 +38,9 @@ type Config struct {
 
 	BlockedTagsRaw string `env:"BLOCKED_TAGS"`
 
-	// ImplicationIndexRefreshHours is how often the canonical implication graph is re-crawled. Zero disables the
-	// index, leaving every implication lookup a miss; exact mode still answers from a single upstream call.
-	ImplicationIndexRefreshHours int `env:"IMPLICATION_INDEX_REFRESH_HOURS" envDefault:"24"`
+	// RelationIndexRefreshHours is how often the canonical alias and implication graphs are re-crawled. Zero disables
+	// the index, leaving every lookup a miss; exact mode still answers from a single upstream call.
+	RelationIndexRefreshHours int `env:"RELATION_INDEX_REFRESH_HOURS" envDefault:"24"`
 }
 
 func Load() (Config, error) {
@@ -100,15 +100,15 @@ func (c Config) Validate() error {
 		return fmt.Errorf("MAX_OFFSET must be at least 1, got %d", c.MaxOffset)
 	}
 
-	if c.ImplicationIndexRefreshHours < 0 {
-		return fmt.Errorf("IMPLICATION_INDEX_REFRESH_HOURS must be zero or greater, got %d", c.ImplicationIndexRefreshHours)
+	if c.RelationIndexRefreshHours < 0 {
+		return fmt.Errorf("RELATION_INDEX_REFRESH_HOURS must be zero or greater, got %d", c.RelationIndexRefreshHours)
 	}
 
 	return nil
 }
 
-func (c Config) ImplicationIndexInterval() time.Duration {
-	return time.Duration(c.ImplicationIndexRefreshHours) * time.Hour
+func (c Config) RelationIndexInterval() time.Duration {
+	return time.Duration(c.RelationIndexRefreshHours) * time.Hour
 }
 
 func splitList(value string) []string {
